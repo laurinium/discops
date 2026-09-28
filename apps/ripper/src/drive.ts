@@ -29,16 +29,19 @@ async function runProbeCommand(command: string, args: string[], timeoutMs: numbe
 export async function probeDrive(device: string): Promise<DriveProbe> {
   try { statSync(device); } catch { return { mediaStatus: 'unknown', trayStatus: 'unknown' }; }
 
-  const sg = await runProbeCommand('sg_turs', [device], 3000);
+  const sg = await runProbeCommand('sg_turs', ['-v', device], 3000);
   const sgText = sg.output.toLowerCase();
   if (!sg.error) {
-    if (sg.code === 0) return { mediaStatus: 'present', trayStatus: 'closed' };
-    if (sgText.includes('tray open') || sgText.includes('not ready to ready change')) {
+    if (sgText.includes('tray open')) {
       return { mediaStatus: 'absent', trayStatus: 'open' };
     }
-    if (sgText.includes('medium not present') || sgText.includes('no medium') || sgText.includes('not ready')) {
+    if (sgText.includes('medium not present') || sgText.includes('no medium')) {
       return { mediaStatus: 'absent', trayStatus: 'closed' };
     }
+    if (sgText.includes('not ready') || sgText.includes('device not ready')) {
+      return { mediaStatus: 'absent', trayStatus: 'unknown' };
+    }
+    if (sg.code === 0) return { mediaStatus: 'present', trayStatus: 'closed' };
   }
 
   const discid = await runProbeCommand('cd-discid', ['-q', '-d', device, 'discid'], 3000);

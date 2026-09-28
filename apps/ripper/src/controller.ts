@@ -97,7 +97,14 @@ export class RipperController {
   private eject(): void {
     if (this.abcde.running) this.abcde.cancel();
     const child = spawn('eject', [this.config.DRIVE_DEVICE], { stdio: 'ignore' });
-    child.on('exit', () => void this.refresh('eject'));
+    child.on('exit', (code) => {
+      if (code === 0) {
+        this.mediaPresent = false;
+        this.trayStatus = 'open';
+        this.setState('ejected');
+      }
+      setTimeout(() => void this.refresh('eject'), 1500).unref();
+    });
   }
 
   private setState(state: JobState, patch: Record<string, unknown> = {}): void {

@@ -13,6 +13,8 @@ export interface DriveState {
   'progressPercent'?: (number | string);
   'currentFile'?: (string);
   'error'?: (string);
+  'trayStatus'?: (string);
+  '_trayStatus'?: "trayStatus";
   '_discId'?: "discId";
   '_artist'?: "artist";
   '_album'?: "album";
@@ -35,6 +37,8 @@ export interface DriveState__Output {
   'progressPercent'?: (number);
   'currentFile'?: (string);
   'error'?: (string);
+  'trayStatus'?: (string);
+  '_trayStatus'?: "trayStatus";
   '_discId'?: "discId";
   '_artist'?: "artist";
   '_album'?: "album";

@@ -124,7 +124,7 @@ services:
     devices:
       - "${RIPPER_SR0_DEVICE:-/dev/sr0}:${RIPPER_SR0_DEVICE:-/dev/sr0}"
 
-  # Enable with: docker compose --profile sr1 up -d
+  # Enable with COMPOSE_PROFILES=sr1 or: docker compose --profile sr1 up -d
   ripper-sr1:
     <<: *ripper-common
     profiles: ["sr1"]
@@ -141,6 +141,24 @@ services:
       DRIVE_DEVICE: ${RIPPER_SR1_DEVICE:-/dev/sr1}
     devices:
       - "${RIPPER_SR1_DEVICE:-/dev/sr1}:${RIPPER_SR1_DEVICE:-/dev/sr1}"
+
+  # Enable with COMPOSE_PROFILES=sr2 or: docker compose --profile sr2 up -d
+  ripper-sr2:
+    <<: *ripper-common
+    profiles: ["sr2"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR2_ID:-drive-03}
+      DRIVE_DEVICE: ${RIPPER_SR2_DEVICE:-/dev/sr2}
+    devices:
+      - "${RIPPER_SR2_DEVICE:-/dev/sr2}:${RIPPER_SR2_DEVICE:-/dev/sr2}"
 
 networks:
   rippy:

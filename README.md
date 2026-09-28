@@ -169,7 +169,7 @@ npm run build
 docker compose up -d --build
 ```
 
-Open `http://localhost:3000`. For two drives, start with `docker compose --profile sr1 up -d`.
+Open `http://localhost:3000`. Extra drives are enabled with profiles, for example `COMPOSE_PROFILES=sr1,sr2 docker compose up -d`.
 
 Output FLAC files are written to `./data/music`. Backend SQLite data is in `./data/backend`.
 

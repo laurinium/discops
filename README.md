@@ -118,10 +118,10 @@ devices:
 Run:
 
 ```bash
-docker compose up -d --build
+docker compose --profile sr1 up -d --build
 ```
 
-Each drive rips independently and concurrently because each has its own ripper container/process.
+`ripper-sr0` is enabled by default; `ripper-sr1` is production-ready behind the `sr1` profile so hosts with only one drive can still run plain `docker compose up -d`. Each drive rips independently and concurrently because each has its own ripper container/process.
 
 ## abcde configuration
 
@@ -149,13 +149,14 @@ environment:
 ## Starting the stack
 
 ```bash
+cp .env.example .env
 npm install
 npm test
 npm run build
 docker compose up -d --build
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000`. For two drives, start with `docker compose --profile sr1 up -d --build`.
 
 Output FLAC files are written to `./data/music`. Backend SQLite data is in `./data/backend`.
 

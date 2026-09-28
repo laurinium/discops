@@ -1,73 +1,142 @@
+name: rippymcripface
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-common-security: &common-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+x-ripper-common: &ripper-common
+  build:
+    context: .
+    dockerfile: apps/ripper/Dockerfile
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
+  depends_on:
+    backend:
+      condition: service_healthy
+  networks:
+    - rippy
+  logging: *default-logging
+  security_opt:
+    - no-new-privileges:true
+  environment:
+    BACKEND_GRPC_ADDR: backend:50051
+    OUTPUT_DIR: /music
+    OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+    AUTO_RIP: ${AUTO_RIP:-true}
+    UDEV_MONITOR: ${UDEV_MONITOR:-true}
+    POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Set if mounting a custom abcde config, e.g. /etc/abcde.conf
+    ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+  volumes:
+    - type: bind
+      source: ${MUSIC_DIR:-./data/music}
+      target: /music
+    - type: bind
+      source: /run/udev
+      target: /run/udev
+      read_only: true
+    # Optional custom abcde config. Uncomment and set ABCDE_CONFIG=/etc/abcde.conf.
+    # - type: bind
+    #   source: ./docker/abcde.conf
+    #   target: /etc/abcde.conf
+    #   read_only: true
+  tmpfs:
+    - /tmp:size=512m,mode=1777
+
 services:
   backend:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     environment:
       BACKEND_HTTP_PORT: "8080"
       BACKEND_GRPC_PORT: "50051"
       DATABASE_PATH: /data/rippy.db
-      CORS_ORIGIN: "*"
-      LOG_LEVEL: info
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
-      - ./data/backend:/data
+      - type: bind
+        source: ${BACKEND_DATA_DIR:-./data/backend}
+        target: /data
     ports:
-      - "8080:8080"
-      - "50051:50051"
-    restart: unless-stopped
+      # Browser/API entrypoint. Bind to 127.0.0.1 behind a reverse proxy by setting:
+      # BACKEND_HTTP_BIND=127.0.0.1:8080
+      - "${BACKEND_HTTP_BIND:-8080}:8080"
+    expose:
+      - "50051"
+    networks:
+      - rippy
+    logging: *default-logging
+    <<: *common-security
 
   frontend:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
     restart: unless-stopped
+    init: true
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_HTTP_BIND:-3000}:8080"
+    networks:
+      - rippy
+    logging: *default-logging
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=64m,mode=0755
+      - /var/run:size=8m,mode=0755
+      - /tmp:size=64m,mode=1777
+    <<: *common-security
 
   ripper-sr0:
-    build:
-      context: .
-      dockerfile: apps/ripper/Dockerfile
+    <<: *ripper-common
     environment:
-      RIPPER_ID: drive-01
-      DRIVE_DEVICE: /dev/sr0
       BACKEND_GRPC_ADDR: backend:50051
       OUTPUT_DIR: /music
-      OUTPUT_FORMAT: flac
-      AUTO_RIP: "true"
-      UDEV_MONITOR: "true"
-      LOG_LEVEL: info
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR0_ID:-drive-01}
+      DRIVE_DEVICE: ${RIPPER_SR0_DEVICE:-/dev/sr0}
     devices:
-      - /dev/sr0:/dev/sr0
-    volumes:
-      - ./data/music:/music
-      - /run/udev:/run/udev:ro
-      # Optional abcde config:
-      # - ./docker/abcde.conf:/etc/abcde.conf:ro
-    depends_on:
-      - backend
-    restart: unless-stopped
+      - "${RIPPER_SR0_DEVICE:-/dev/sr0}:${RIPPER_SR0_DEVICE:-/dev/sr0}"
 
-  # Uncomment when a second physical drive exists.
-  # ripper-sr1:
-  #   build:
-  #     context: .
-  #     dockerfile: apps/ripper/Dockerfile
-  #   environment:
-  #     RIPPER_ID: drive-02
-  #     DRIVE_DEVICE: /dev/sr1
-  #     BACKEND_GRPC_ADDR: backend:50051
-  #     OUTPUT_DIR: /music
-  #     OUTPUT_FORMAT: flac
-  #     AUTO_RIP: "true"
-  #     UDEV_MONITOR: "true"
-  #   devices:
-  #     - /dev/sr1:/dev/sr1
-  #   volumes:
-  #     - ./data/music:/music
-  #     - /run/udev:/run/udev:ro
-  #   depends_on:
-  #     - backend
-  #   restart: unless-stopped
+  # Enable with: docker compose --profile sr1 up -d
+  ripper-sr1:
+    <<: *ripper-common
+    profiles: ["sr1"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR1_ID:-drive-02}
+      DRIVE_DEVICE: ${RIPPER_SR1_DEVICE:-/dev/sr1}
+    devices:
+      - "${RIPPER_SR1_DEVICE:-/dev/sr1}:${RIPPER_SR1_DEVICE:-/dev/sr1}"
+
+networks:
+  rippy:
+    driver: bridge

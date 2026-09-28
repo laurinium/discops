@@ -150,13 +150,26 @@ environment:
 
 ```bash
 cp .env.example .env
+docker compose up -d
+```
+
+The compose file references CI-published images by default:
+
+```env
+IMAGE_PREFIX=ghcr.io/laurinium/discops
+IMAGE_TAG=latest
+```
+
+For local development builds instead:
+
+```bash
 npm install
 npm test
 npm run build
 docker compose up -d --build
 ```
 
-Open `http://localhost:3000`. For two drives, start with `docker compose --profile sr1 up -d --build`.
+Open `http://localhost:3000`. For two drives, start with `docker compose --profile sr1 up -d`.
 
 Output FLAC files are written to `./data/music`. Backend SQLite data is in `./data/backend`.
 

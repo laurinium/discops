@@ -1,0 +1,13 @@
+# Example abcde config. Mount as /etc/abcde.conf and set ABCDE_CONFIG=/etc/abcde.conf.
+OUTPUTTYPE=flac
+OUTPUTDIR=/music
+INTERACTIVE=n
+EJECTCD=y
+PADTRACKS=y
+MAXPROCS=2
+CDROMREADERSYNTAX=cdparanoia
+CDPARANOIA=cdparanoia
+CDDISCID=cd-discid
+FLAC=flac
+OUTPUTFORMAT='${ARTISTFILE}/${ALBUMFILE}/${TRACKNUM} - ${TRACKFILE}'
+VAOUTPUTFORMAT='Various/${ALBUMFILE}/${TRACKNUM} - ${ARTISTFILE} - ${TRACKFILE}'

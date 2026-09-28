@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ts
+coverage
+.env
+*.db
+*.db-*
+data/music/*
+data/backend/*
+!data/music/.gitkeep
+!data/backend/.gitkeep

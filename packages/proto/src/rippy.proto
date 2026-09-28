@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package rippy.v1;
+
+service RipperService {
+  rpc Connect(stream RipperToBackend) returns (stream BackendToRipper);
+}
+
+message RipperToBackend {
+  string ripper_id = 1;
+  int64 timestamp_unix_ms = 2;
+  oneof event {
+    RipperHello hello = 10;
+    Heartbeat heartbeat = 11;
+    DriveState drive_state = 12;
+    DiscEvent disc_event = 13;
+    RipEvent rip_event = 14;
+    RipLog rip_log = 15;
+  }
+}
+
+message BackendToRipper {
+  string command_id = 1;
+  int64 timestamp_unix_ms = 2;
+  oneof command {
+    StartRip start_rip = 10;
+    CancelRip cancel_rip = 11;
+    EjectDisc eject_disc = 12;
+    RefreshDisc refresh_disc = 13;
+  }
+}
+
+message RipperHello {
+  string device = 1;
+  string hostname = 2;
+  bool auto_rip = 3;
+  string output_format = 4;
+  string output_dir = 5;
+}
+
+message Heartbeat { string status = 1; }
+
+message DriveState {
+  string device = 1;
+  bool media_present = 2;
+  string state = 3;
+  optional string disc_id = 4;
+  optional string artist = 5;
+  optional string album = 6;
+  optional uint32 current_track = 7;
+  optional uint32 total_tracks = 8;
+  optional double progress_percent = 9;
+  optional string current_file = 10;
+  optional string error = 11;
+}
+
+enum DiscEventType {
+  DISC_EVENT_TYPE_UNSPECIFIED = 0;
+  DISC_INSERTED = 1;
+  DISC_REMOVED = 2;
+  MEDIA_CHANGED = 3;
+  UNSUPPORTED_MEDIA = 4;
+}
+
+message DiscEvent {
+  DiscEventType type = 1;
+  string device = 2;
+  optional string disc_id = 3;
+  optional string reason = 4;
+}
+
+enum RipEventType {
+  RIP_EVENT_TYPE_UNSPECIFIED = 0;
+  RIP_STARTED = 1;
+  RIP_PROGRESS = 2;
+  RIP_COMPLETED = 3;
+  RIP_FAILED = 4;
+  RIP_CANCELLED = 5;
+}
+
+message RipEvent {
+  RipEventType type = 1;
+  string job_id = 2;
+  optional uint32 current_track = 3;
+  optional uint32 total_tracks = 4;
+  optional double progress_percent = 5;
+  optional string current_file = 6;
+  optional string error = 7;
+}
+
+message RipLog {
+  string job_id = 1;
+  string stream = 2;
+  string line = 3;
+}
+
+message StartRip { optional string job_id = 1; }
+message CancelRip { string reason = 1; }
+message EjectDisc {}
+message RefreshDisc {}

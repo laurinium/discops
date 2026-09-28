@@ -1,0 +1,1 @@
+{"name":"@rippy/ripper","version":"0.1.0","type":"module","main":"dist/index.js","scripts":{"dev":"tsx watch src/index.ts","build":"tsc -p tsconfig.json","start":"node dist/index.js","test":"vitest run"},"dependencies":{"@grpc/grpc-js":"^1.12.2","@rippy/config":"0.1.0","@rippy/proto":"0.1.0","@rippy/shared":"0.1.0","pino":"^9.4.0"},"devDependencies":{"tsx":"^4.19.1"}}

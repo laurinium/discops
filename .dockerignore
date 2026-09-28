@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ts
+coverage
+.git
+.gitignore
+data
+*.db
+*.db-*
+npm-debug.log

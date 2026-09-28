@@ -32,7 +32,7 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
     <div className="buttons">
       <button onClick={() => void command(drive.ripperId, 'startRip')}>Start</button>
       <button onClick={() => void command(drive.ripperId, 'cancelRip')}>Cancel</button>
-      <button onClick={() => void command(drive.ripperId, 'ejectDisc')}>Eject</button>
+      <button onClick={() => void command(drive.ripperId, 'ejectDisc')}>{drive.trayStatus === 'open' ? 'Close tray' : 'Eject'}</button>
       <button onClick={() => void command(drive.ripperId, 'refreshDisc')}>Refresh</button>
     </div>
     <h3>Recent log</h3>

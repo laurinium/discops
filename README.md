@@ -187,7 +187,7 @@ Endpoints:
 - `GET /api/events` (SSE)
 - `POST /api/rippers/:ripperId/startRip`
 - `POST /api/rippers/:ripperId/cancelRip`
-- `POST /api/rippers/:ripperId/ejectDisc`
+- `POST /api/rippers/:ripperId/ejectDisc` (toggles tray: eject when closed, close when open)
 - `POST /api/rippers/:ripperId/refreshDisc`
 
 ## Reliability behavior

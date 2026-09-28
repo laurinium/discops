@@ -96,14 +96,21 @@ export class RipperController {
 
   private eject(): void {
     if (this.abcde.running) this.abcde.cancel();
-    const child = spawn('eject', [this.config.DRIVE_DEVICE], { stdio: 'ignore' });
+    const closing = this.trayStatus === 'open';
+    const args = closing ? ['-t', this.config.DRIVE_DEVICE] : [this.config.DRIVE_DEVICE];
+    const child = spawn('eject', args, { stdio: 'ignore' });
     child.on('exit', (code) => {
       if (code === 0) {
-        this.mediaPresent = false;
-        this.trayStatus = 'open';
-        this.setState('ejected');
+        if (closing) {
+          this.trayStatus = 'closed';
+          this.setState(this.mediaPresent ? this.state : 'idle');
+        } else {
+          this.mediaPresent = false;
+          this.trayStatus = 'open';
+          this.setState('ejected');
+        }
       }
-      setTimeout(() => void this.refresh('eject'), 1500).unref();
+      setTimeout(() => void this.refresh(closing ? 'close-tray' : 'eject'), 1500).unref();
     });
   }
 

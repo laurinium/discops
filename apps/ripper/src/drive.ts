@@ -3,16 +3,51 @@ import { EventEmitter } from 'node:events';
 import { statSync } from 'node:fs';
 
 export type MediaStatus = 'present' | 'absent' | 'unknown' | 'unsupported';
+export type TrayStatus = 'open' | 'closed' | 'unknown';
+export interface DriveProbe {
+  mediaStatus: MediaStatus;
+  trayStatus: TrayStatus;
+}
+
+async function runProbeCommand(command: string, args: string[], timeoutMs: number): Promise<{ code: number | null; output: string; error?: string }> {
+  return await new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      resolve({ code: null, output, error: 'timeout' });
+    }, timeoutMs);
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => { output += chunk; });
+    child.stderr.on('data', (chunk: string) => { output += chunk; });
+    child.on('exit', (code) => { clearTimeout(timer); resolve({ code, output }); });
+    child.on('error', (err) => { clearTimeout(timer); resolve({ code: null, output, error: err.message }); });
+  });
+}
+
+export async function probeDrive(device: string): Promise<DriveProbe> {
+  try { statSync(device); } catch { return { mediaStatus: 'unknown', trayStatus: 'unknown' }; }
+
+  const sg = await runProbeCommand('sg_turs', [device], 3000);
+  const sgText = sg.output.toLowerCase();
+  if (!sg.error) {
+    if (sg.code === 0) return { mediaStatus: 'present', trayStatus: 'closed' };
+    if (sgText.includes('tray open') || sgText.includes('not ready to ready change')) {
+      return { mediaStatus: 'absent', trayStatus: 'open' };
+    }
+    if (sgText.includes('medium not present') || sgText.includes('no medium') || sgText.includes('not ready')) {
+      return { mediaStatus: 'absent', trayStatus: 'closed' };
+    }
+  }
+
+  const discid = await runProbeCommand('cd-discid', ['-q', '-d', device, 'discid'], 3000);
+  if (discid.code === 0) return { mediaStatus: 'present', trayStatus: 'closed' };
+  return { mediaStatus: 'absent', trayStatus: 'unknown' };
+}
 
 export async function checkMedia(device: string): Promise<MediaStatus> {
-  try { statSync(device); } catch { return 'unknown'; }
-  const args = ['-q', '-d', device, 'discid'];
-  return await new Promise((resolve) => {
-    const child = spawn('cd-discid', args, { stdio: ['ignore', 'ignore', 'ignore'] });
-    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve('unknown'); }, 3000);
-    child.on('exit', (code) => { clearTimeout(timer); resolve(code === 0 ? 'present' : 'absent'); });
-    child.on('error', () => { clearTimeout(timer); resolve('unknown'); });
-  });
+  return (await probeDrive(device)).mediaStatus;
 }
 
 export class UdevMonitor extends EventEmitter {

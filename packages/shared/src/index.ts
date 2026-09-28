@@ -21,12 +21,15 @@ export const RipperCommandSchema = z.object({
 });
 export type RipperCommandRequest = z.infer<typeof RipperCommandSchema>;
 
+export type TrayStatus = 'open' | 'closed' | 'unknown';
+
 export interface DriveSnapshot {
   ripperId: string;
   device: string;
   connected: boolean;
   state: JobState;
   mediaPresent: boolean;
+  trayStatus?: TrayStatus;
   discId?: string;
   artist?: string;
   album?: string;

@@ -21,6 +21,7 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
     <dl>
       <dt>Status</dt><dd>{drive.state}</dd>
       <dt>Media</dt><dd>{drive.mediaPresent ? 'present' : 'none'}</dd>
+      <dt>Tray</dt><dd>{drive.trayStatus ?? 'unknown'}</dd>
       {drive.artist && <><dt>Artist</dt><dd>{drive.artist}</dd></>}
       {drive.album && <><dt>Album</dt><dd>{drive.album}</dd></>}
       {drive.currentTrack && <><dt>Track</dt><dd>{drive.currentTrack} / {drive.totalTracks ?? '?'}</dd></>}

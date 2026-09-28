@@ -167,6 +167,7 @@ export const openApiDocument = {
           connected: { type: 'boolean' },
           state: { $ref: '#/components/schemas/JobState' },
           mediaPresent: { type: 'boolean' },
+          trayStatus: { type: 'string', enum: ['open', 'closed', 'unknown'] },
           discId: { type: 'string' },
           artist: { type: 'string' },
           album: { type: 'string' },

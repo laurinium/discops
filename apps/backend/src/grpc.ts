@@ -35,7 +35,7 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const d = msg.driveState as Event;
           state.patch(ripperId, defined<Partial<DriveSnapshot>>({
             device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: (str(d.state) ?? 'idle') as JobState,
-            discId: str(d.discId), artist: str(d.artist), album: str(d.album), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
+            trayStatus: str(d.trayStatus), discId: str(d.discId), artist: str(d.artist), album: str(d.album), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
             progressPercent: num(d.progressPercent), currentFile: str(d.currentFile), error: str(d.error),
           }));
         }

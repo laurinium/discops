@@ -3,7 +3,7 @@ import type { RipperConfig } from '@rippy/config';
 import type { JobState } from '@rippy/shared';
 import { AbcdeRunner } from './abcde.js';
 import { BackendClient, driveState } from './client.js';
-import { checkMedia, UdevMonitor } from './drive.js';
+import { probeDrive, UdevMonitor, type TrayStatus } from './drive.js';
 
 type Logger = { info(o: object): void; warn(o: object): void; error(o: object): void };
 
@@ -16,6 +16,7 @@ export class RipperController {
   private poll?: NodeJS.Timeout;
   private state: JobState = 'idle';
   private mediaPresent = false;
+  private trayStatus: TrayStatus = 'unknown';
   private activeJobId?: string;
 
   constructor(private config: RipperConfig, private log: Logger) {
@@ -56,8 +57,10 @@ export class RipperController {
   }
 
   private async refresh(source: string): Promise<void> {
-    const status = await checkMedia(this.config.DRIVE_DEVICE);
-    this.log.info({ event: 'drive_refresh', source, status, device: this.config.DRIVE_DEVICE });
+    const probe = await probeDrive(this.config.DRIVE_DEVICE);
+    const status = probe.mediaStatus;
+    this.trayStatus = probe.trayStatus;
+    this.log.info({ event: 'drive_refresh', source, status, trayStatus: this.trayStatus, device: this.config.DRIVE_DEVICE });
     if (status === 'present' && !this.mediaPresent) {
       this.mediaPresent = true;
       this.setState('disc-detected');
@@ -69,7 +72,7 @@ export class RipperController {
       this.setState('ejected');
       this.client.send({ discEvent: { type: 'DISC_REMOVED', device: this.config.DRIVE_DEVICE } });
     } else {
-      this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent));
+      this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus }));
     }
   }
 
@@ -99,6 +102,6 @@ export class RipperController {
 
   private setState(state: JobState, patch: Record<string, unknown> = {}): void {
     this.state = state;
-    this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, patch));
+    this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus, ...patch }));
   }
 }

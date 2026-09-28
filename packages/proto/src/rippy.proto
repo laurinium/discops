@@ -44,6 +44,7 @@ message DriveState {
   string device = 1;
   bool media_present = 2;
   string state = 3;
+  optional string tray_status = 12;
   optional string disc_id = 4;
   optional string artist = 5;
   optional string album = 6;

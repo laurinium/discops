@@ -15,7 +15,7 @@ export class AbcdeRunner extends EventEmitter {
     const jobId = crypto.randomUUID();
     const args = ['-d', opts.device, '-o', opts.outputFormat];
     if (opts.configPath) args.push('-c', opts.configPath);
-    const env = { ...process.env, OUTPUTDIR: opts.outputDir };
+    const env = { ...process.env, TERM: process.env.TERM ?? 'dumb', OUTPUTDIR: opts.outputDir };
     this.child = spawn('abcde', args, { env, cwd: opts.outputDir, shell: false });
     this.emit('started', jobId);
     const onLine = (stream: 'stdout' | 'stderr', data: Buffer) => {

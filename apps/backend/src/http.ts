@@ -1,12 +1,29 @@
 import express from 'express';
 import cors from 'cors';
 import type { AppState } from './state.js';
+import { openApiDocument } from './openapi.js';
 
 export function createHttp(state: AppState, corsOrigin: string): express.Express {
   const app = express();
   app.use(cors({ origin: corsOrigin === '*' ? true : corsOrigin }));
   app.use(express.json({ limit: '64kb' }));
   app.get('/healthz', (_req, res) => res.json({ ok: true }));
+  app.get('/openapi.json', (_req, res) => res.json(openApiDocument));
+  app.get('/docs', (_req, res) => {
+    res.type('html').send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rippymcripface API Docs</title>
+    <style>body{margin:0;font-family:Inter,system-ui,sans-serif}</style>
+  </head>
+  <body>
+    <script id="api-reference" data-url="/openapi.json"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>`);
+  });
   app.get('/api/state', (_req, res) => res.json({ drives: state.listDrives(), history: state.history() }));
   app.post('/api/rippers/:ripperId/:command', (req, res, next) => {
     try {

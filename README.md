@@ -175,6 +175,13 @@ Output FLAC files are written to `./data/music`. Backend SQLite data is in `./da
 
 ## HTTP API
 
+OpenAPI docs are served by the backend:
+
+- `GET /docs` interactive API reference
+- `GET /openapi.json` OpenAPI 3.1 document
+
+Endpoints:
+
 - `GET /healthz`
 - `GET /api/state`
 - `GET /api/events` (SSE)

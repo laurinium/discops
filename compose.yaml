@@ -62,6 +62,7 @@ services:
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
     init: true
+    user: "${PUID:-1001}:${PGID:-1001}"
     stop_grace_period: 30s
     environment:
       BACKEND_HTTP_PORT: "8080"
@@ -104,7 +105,8 @@ services:
       - /var/cache/nginx:size=64m,mode=0755
       - /var/run:size=8m,mode=0755
       - /tmp:size=64m,mode=1777
-    <<: *common-security
+    security_opt:
+      - no-new-privileges:true
 
   ripper-sr0:
     <<: *ripper-common

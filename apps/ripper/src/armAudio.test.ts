@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -36,8 +36,10 @@ describe('ARM-style audio orchestration helpers', () => {
     const paths = makeFlacs(12);
     const validation = validateCompletedRip(paths, 12, 0);
     expect(validation.ok).toBe(true);
-    atomicPublish(paths, path.join(root, 'music'));
-    expect(() => atomicPublish(paths, path.join(root, 'music'))).toThrow(/overwrite/);
+    const library = path.join(root, 'music');
+    atomicPublish(paths, library);
+    expect(() => atomicPublish(paths, library)).toThrow(/overwrite/);
+    expect(() => readdirSync(library).find((entry) => entry.startsWith('.rippy-staging-'))).not.toThrow();
   });
 
   it('fails partial read output and publishes nothing', () => {

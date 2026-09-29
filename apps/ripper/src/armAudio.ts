@@ -144,11 +144,33 @@ export function atomicPublish(paths: JobPaths, libraryDir: string): void {
   const topEntries = readdirSync(paths.publishDir);
   if (topEntries.length === 0) throw new Error('nothing to publish');
   mkdirSync(libraryDir, { recursive: true });
+
   for (const entry of topEntries) {
-    const src = path.join(paths.publishDir, entry);
     const dest = path.join(libraryDir, entry);
     if (existsSync(dest)) throw new Error(`refusing to overwrite existing library path ${dest}`);
-    renameSync(src, dest);
+  }
+
+  // /work and /music may be different mounts. Cross-device rename is impossible,
+  // so copy to a hidden staging directory inside the final library filesystem,
+  // then perform same-filesystem renames into the visible library paths.
+  const libraryStaging = path.join(libraryDir, `.rippy-staging-${path.basename(paths.workDir)}`);
+  rmSync(libraryStaging, { recursive: true, force: true });
+  mkdirSync(libraryStaging, { recursive: true });
+  try {
+    for (const entry of topEntries) {
+      cpSync(path.join(paths.publishDir, entry), path.join(libraryStaging, entry), {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      });
+    }
+    for (const entry of topEntries) {
+      renameSync(path.join(libraryStaging, entry), path.join(libraryDir, entry));
+    }
+    rmSync(libraryStaging, { recursive: true, force: true });
+  } catch (err) {
+    rmSync(libraryStaging, { recursive: true, force: true });
+    throw err;
   }
 }
 

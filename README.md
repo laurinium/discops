@@ -89,7 +89,9 @@ volumes:
 
 The `/dev/sgX` mapping is important for reliable `cdparanoia`/`abcde` reads on many drives.
 
-The container does **not** run `udevd`. It runs `udevadm monitor` against host udev data and has a small polling fallback for resilience. `privileged: true` is intentionally not enabled by default.
+The ripper also has `CAP_SYS_ADMIN` so the guarded UI **Reset drive** action can run `sg_reset --device /dev/sgX`. This is intentionally narrower than `privileged: true`, which is not enabled by default. If you do not want UI drive reset support, remove `cap_add: [SYS_ADMIN]` from the ripper service.
+
+The container does **not** run `udevd`. It runs `udevadm monitor` against host udev data and has a small polling fallback for resilience.
 
 If your distro blocks access, check group/device permissions first. Some unusual USB/SCSI setups may require adding related generic devices (for example `/dev/sg*`) or relaxing cgroup/device rules.
 

@@ -28,6 +28,9 @@ x-ripper-common: &ripper-common
   logging: *default-logging
   security_opt:
     - no-new-privileges:true
+  # Required only for sg_reset-based optical drive reset from the UI.
+  cap_add:
+    - SYS_ADMIN
   environment:
     BACKEND_GRPC_ADDR: backend:50051
     OUTPUT_DIR: /music

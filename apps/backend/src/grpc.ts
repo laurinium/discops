@@ -80,7 +80,7 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
         if ('ripLog' in msg && msg.ripLog && typeof msg.ripLog === 'object') {
           const l = msg.ripLog as Event;
           const rawLine = str(l.line) ?? '';
-          state.appendLog(ripperId, `[${str(l.stream) ?? 'out'}] ${rawLine}`);
+          state.appendLog(ripperId, `${new Date().toISOString()} ${rawLine}`);
           const metadataPatch = metadataFromLog(rawLine, state.getDrive(ripperId));
           if (metadataPatch) state.patch(ripperId, metadataPatch);
         }

@@ -35,7 +35,10 @@ export class AbcdeRunner extends EventEmitter {
     writeArmAbcdeConfig(paths, opts.outputFormat);
     writeFileSync(`${paths.workDir}/RUNNING`, new Date().toISOString());
     const expectation = readTrackExpectation(opts.device);
-    writeFileSync(`${paths.workDir}/job.json`, JSON.stringify({ jobId, device: opts.device, discId: expectation.discId, expectedTracks: expectation.expectedTracks, startedAt: new Date().toISOString() }, null, 2));
+    let expectedTracks = expectation.expectedTracks;
+    let nextLineContainsTrackList = false;
+    const writeJobMetadata = (): void => writeFileSync(`${paths.workDir}/job.json`, JSON.stringify({ jobId, device: opts.device, discId: expectation.discId, expectedTracks, startedAt: new Date().toISOString() }, null, 2));
+    writeJobMetadata();
 
     const args = ['-N', '-V', '-d', opts.device, '-c', paths.abcdeConfig];
     const env = { ...process.env, TERM: process.env.TERM ?? 'dumb' };
@@ -51,8 +54,21 @@ export class AbcdeRunner extends EventEmitter {
       log.write(data);
       for (const line of data.toString('utf8').split(/\r?\n/).filter(Boolean)) {
         this.emit('log', { jobId, stream, line });
+        if (nextLineContainsTrackList) {
+          const parsedExpectedTracks = parseAbcdeTrackListCount(line);
+          if (parsedExpectedTracks > 0) {
+            expectedTracks = parsedExpectedTracks;
+            writeJobMetadata();
+            this.emit('progress', { jobId, totalTracks: expectedTracks, phase: 'METADATA_LOOKUP' });
+          }
+          nextLineContainsTrackList = false;
+        }
+        if (/Grabbing entire CD - tracks:/i.test(line)) nextLineContainsTrackList = true;
         const progress = parseProgress(line);
-        if (progress) this.emit('progress', { jobId, ...progress });
+        if (progress) {
+          if (progress.totalTracks) expectedTracks = progress.totalTracks;
+          this.emit('progress', { jobId, ...progress });
+        }
       }
     };
     this.child.stdout.on('data', (d: Buffer) => onLine('stdout', stdoutLog, d));
@@ -68,7 +84,7 @@ export class AbcdeRunner extends EventEmitter {
         this.emit('cancelled', { jobId });
         return;
       }
-      const validation = validateCompletedRip(paths, expectation.expectedTracks, code);
+      const validation = validateCompletedRip(paths, expectedTracks, code);
       if (!validation.ok) {
         this.fail(jobId, paths, validation.failureType ?? 'UNKNOWN_ERROR', validation.error ?? `abcde exited code=${code} signal=${signal ?? ''}`, code, signal);
         return;
@@ -109,6 +125,11 @@ export class AbcdeRunner extends EventEmitter {
     if (existsSync(`${paths.workDir}/RUNNING`)) rmSync(`${paths.workDir}/RUNNING`, { force: true });
     writeFileSync(`${paths.workDir}/${marker}`, new Date().toISOString());
   }
+}
+
+export function parseAbcdeTrackListCount(line: string): number {
+  const matches = line.match(/\b\d{2,3}\b/g) ?? [];
+  return matches.length;
 }
 
 export function parseProgress(line: string): Progress | undefined {

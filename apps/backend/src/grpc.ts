@@ -14,14 +14,15 @@ function pkg(): grpc.ServiceClientConstructor & { service: grpc.ServiceDefinitio
 function str(v: unknown): string | undefined { return typeof v === 'string' && v.length > 0 ? v : undefined; }
 function num(v: unknown): number | undefined { return typeof v === 'number' ? v : undefined; }
 function tracks(v: unknown): TrackMetadata[] | undefined {
-  if (!Array.isArray(v)) return undefined;
-  return v.flatMap((item) => {
+  if (!Array.isArray(v) || v.length === 0) return undefined;
+  const parsed = v.flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
     const record = item as Record<string, unknown>;
     const number = num(record.number);
     const title = str(record.title);
     return number && title ? [{ number, title }] : [];
   });
+  return parsed.length > 0 ? parsed : undefined;
 }
 function defined<T extends object>(value: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;

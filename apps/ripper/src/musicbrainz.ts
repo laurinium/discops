@@ -24,7 +24,7 @@ export async function lookupMusicBrainzDisc(device: string): Promise<MusicBrainz
 }
 
 function readMusicBrainzDiscId(device: string): string | undefined {
-  const script = 'from discid import read; import sys; print(read(sys.argv[1]).id)';
+  const script = 'import sys\ntry:\n import libdiscid\n print(libdiscid.read(sys.argv[1]).id)\nexcept ImportError:\n from discid import read\n print(read(sys.argv[1]).id)' ;
   const result = spawnSync('python3', ['-c', script, device], { encoding: 'utf8', timeout: 10_000 });
   if (result.status !== 0) return undefined;
   const id = result.stdout.trim();

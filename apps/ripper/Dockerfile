@@ -10,7 +10,7 @@ FROM node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  abcde cd-discid cdparanoia flac eject sg3-utils python3 python3-discid udev util-linux glyrc wget ca-certificates \
+  abcde cd-discid cdparanoia flac eject sg3-utils python3 python3-libdiscid udev util-linux glyrc wget ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules

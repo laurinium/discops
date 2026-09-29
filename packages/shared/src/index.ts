@@ -23,6 +23,11 @@ export type RipperCommandRequest = z.infer<typeof RipperCommandSchema>;
 
 export type TrayStatus = 'open' | 'closed' | 'unknown';
 
+export interface TrackMetadata {
+  number: number;
+  title: string;
+}
+
 export interface DriveSnapshot {
   ripperId: string;
   device: string;
@@ -33,6 +38,7 @@ export interface DriveSnapshot {
   discId?: string;
   artist?: string;
   album?: string;
+  tracks?: TrackMetadata[];
   currentTrack?: number;
   totalTracks?: number;
   progressPercent?: number;

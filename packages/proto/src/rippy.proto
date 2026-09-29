@@ -40,11 +40,17 @@ message RipperHello {
 
 message Heartbeat { string status = 1; }
 
+message TrackMetadata {
+  uint32 number = 1;
+  string title = 2;
+}
+
 message DriveState {
   string device = 1;
   bool media_present = 2;
   string state = 3;
   optional string tray_status = 12;
+  repeated TrackMetadata tracks = 13;
   optional string disc_id = 4;
   optional string artist = 5;
   optional string album = 6;

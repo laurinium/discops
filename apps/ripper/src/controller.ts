@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import type { RipperConfig } from '@rippy/config';
-import type { JobState } from '@rippy/shared';
+import type { JobState, TrackMetadata } from '@rippy/shared';
 import { AbcdeRunner } from './abcde.js';
 import { BackendClient, driveState } from './client.js';
 import { probeDrive, UdevMonitor, type TrayStatus } from './drive.js';
@@ -17,6 +17,9 @@ export class RipperController {
   private state: JobState = 'idle';
   private mediaPresent = false;
   private trayStatus: TrayStatus = 'unknown';
+  private artist: string | undefined;
+  private album: string | undefined;
+  private tracks: TrackMetadata[] = [];
   private activeJobId?: string;
 
   constructor(private config: RipperConfig, private log: Logger) {
@@ -46,11 +49,20 @@ export class RipperController {
   private wireAbcde(): void {
     this.abcde.on('started', (jobId: string) => {
       this.activeJobId = jobId;
-      this.setState('ripping');
+      this.artist = undefined;
+      this.album = undefined;
+      this.tracks = [];
+      this.setState('reading-metadata');
       this.client.send({ ripEvent: { type: 'RIP_STARTED', jobId } });
     });
-    this.abcde.on('log', (l: { jobId: string; stream: string; line: string }) => this.client.send({ ripLog: l }));
-    this.abcde.on('progress', (p: Record<string, unknown>) => this.client.send({ ripEvent: { type: 'RIP_PROGRESS', ...p } }));
+    this.abcde.on('log', (l: { jobId: string; stream: string; line: string }) => {
+      this.parseMetadataLine(l.line);
+      this.client.send({ ripLog: l });
+    });
+    this.abcde.on('progress', (p: Record<string, unknown>) => {
+      this.setState('ripping', p);
+      this.client.send({ ripEvent: { type: 'RIP_PROGRESS', ...p } });
+    });
     this.abcde.on('completed', ({ jobId }: { jobId: string }) => { this.setState('completed', { progressPercent: 100 }); this.client.send({ ripEvent: { type: 'RIP_COMPLETED', jobId } }); });
     this.abcde.on('failed', ({ jobId, error }: { jobId: string; error: string }) => { this.setState('failed', { error }); this.client.send({ ripEvent: { type: 'RIP_FAILED', jobId, error } }); });
     this.abcde.on('cancelled', ({ jobId }: { jobId: string }) => { this.setState('cancelled'); this.client.send({ ripEvent: { type: 'RIP_CANCELLED', jobId } }); });
@@ -73,6 +85,29 @@ export class RipperController {
       this.client.send({ discEvent: { type: 'DISC_REMOVED', device: this.config.DRIVE_DEVICE } });
     } else {
       this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus }));
+    }
+  }
+
+  private parseMetadataLine(line: string): void {
+    const selected = line.match(/Selected:\s+#\d+\s+\((.+?)\s+\/\s+(.+?)\)\s*$/i);
+    const candidate = line.match(/^#\d+\s+\([^)]+\):\s+----\s+(.+?)\s+\/\s+(.+?)\s+----\s*$/);
+    const metadata = selected ?? candidate;
+    if (metadata?.[1] && metadata?.[2]) {
+      this.artist = metadata[1].trim();
+      this.album = metadata[2].trim();
+      this.setState('reading-metadata');
+      return;
+    }
+
+    const track = line.match(/^\s*(\d{1,3}):\s+(.+?)\s*$/);
+    if (track?.[1] && track?.[2]) {
+      const number = Number(track[1]);
+      const title = track[2].trim();
+      if (!Number.isNaN(number) && title) {
+        const withoutDuplicate = this.tracks.filter((t) => t.number !== number);
+        this.tracks = [...withoutDuplicate, { number, title }].sort((a, b) => a.number - b.number);
+        this.setState('reading-metadata', { totalTracks: this.tracks.length });
+      }
     }
   }
 
@@ -116,6 +151,12 @@ export class RipperController {
 
   private setState(state: JobState, patch: Record<string, unknown> = {}): void {
     this.state = state;
-    this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus, ...patch }));
+    this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, {
+      trayStatus: this.trayStatus,
+      artist: this.artist,
+      album: this.album,
+      tracks: this.tracks,
+      ...patch,
+    }));
   }
 }

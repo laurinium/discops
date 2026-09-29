@@ -25,7 +25,7 @@ flowchart LR
 
 ## Services
 
-- `frontend`: React + TypeScript UI at `http://localhost:3000`.
+- `frontend`: React + TypeScript UI at `http://localhost:3000`, including live drive state, album art lookup, track lists, progress, logs, and history.
 - `backend`: Node.js + TypeScript coordinator. Exposes HTTP API/SSE on `:8080`, gRPC on `:50051`, persists job history in SQLite.
 - `ripper`: Node.js + TypeScript drive agent. Each instance owns exactly one device (`/dev/sr0`, `/dev/sr1`), watches udev, runs `abcde`, streams events/logs to backend.
 
@@ -125,10 +125,10 @@ docker compose --profile sr1 up -d --build
 
 ## abcde configuration
 
-The ripper invokes `abcde` with process args, not shell strings:
+The ripper invokes `abcde` with process args, not shell strings. It runs in noninteractive verbose mode:
 
 ```bash
-abcde -d /dev/sr0 -o flac
+abcde -N -V -d /dev/sr0 -o flac
 ```
 
 Config knobs:

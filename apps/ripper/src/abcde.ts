@@ -13,7 +13,7 @@ export class AbcdeRunner extends EventEmitter {
     if (this.child) throw new Error('abcde already running');
     this.cancelled = false;
     const jobId = crypto.randomUUID();
-    const args = ['-N', '-d', opts.device, '-o', opts.outputFormat];
+    const args = ['-N', '-V', '-d', opts.device, '-o', opts.outputFormat];
     if (opts.configPath) args.push('-c', opts.configPath);
     const env = { ...process.env, TERM: process.env.TERM ?? 'dumb', OUTPUTDIR: opts.outputDir };
     this.child = spawn('abcde', args, { env, cwd: opts.outputDir, shell: false });
@@ -46,7 +46,7 @@ export class AbcdeRunner extends EventEmitter {
 }
 
 export function parseProgress(line: string): Progress | undefined {
-  const track = line.match(/track\s+(\d+)\s+of\s+(\d+)/i) ?? line.match(/Track\s+(\d+)\/(\d+)/i);
+  const track = line.match(/track\s+(\d+)\s+of\s+(\d+)/i) ?? line.match(/Track\s+(\d+)\/(\d+)/i) ?? line.match(/Grabbing track\s+(\d+)/i);
   const pct = line.match(/(\d{1,3}(?:\.\d+)?)%/);
   const file = line.match(/(?:output|encoding|ripping).*?([^/\s]+\.(?:flac|mp3|ogg|m4a|wav))/i);
   if (!track && !pct && !file) return undefined;

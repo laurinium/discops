@@ -25,6 +25,7 @@ export interface ProtoGrpcType {
       RipperService: SubtypeConstructor<typeof grpc.Client, _rippy_v1_RipperServiceClient> & { service: _rippy_v1_RipperServiceDefinition }
       RipperToBackend: MessageTypeDefinition
       StartRip: MessageTypeDefinition
+      TrackMetadata: MessageTypeDefinition
     }
   }
 }

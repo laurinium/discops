@@ -1,7 +1,7 @@
 import os from 'node:os';
 import * as grpc from '@grpc/grpc-js';
 import { loadProto } from '@rippy/proto';
-import type { DriveSnapshot, HistoryJob, JobState } from '@rippy/shared';
+import type { DriveSnapshot, HistoryJob, JobState, TrackMetadata } from '@rippy/shared';
 import type { AppState } from './state.js';
 import { logger } from './logger.js';
 
@@ -13,6 +13,16 @@ function pkg(): grpc.ServiceClientConstructor & { service: grpc.ServiceDefinitio
 }
 function str(v: unknown): string | undefined { return typeof v === 'string' && v.length > 0 ? v : undefined; }
 function num(v: unknown): number | undefined { return typeof v === 'number' ? v : undefined; }
+function tracks(v: unknown): TrackMetadata[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  return v.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const record = item as Record<string, unknown>;
+    const number = num(record.number);
+    const title = str(record.title);
+    return number && title ? [{ number, title }] : [];
+  });
+}
 function defined<T extends object>(value: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
@@ -35,7 +45,7 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const d = msg.driveState as Event;
           state.patch(ripperId, defined<Partial<DriveSnapshot>>({
             device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: (str(d.state) ?? 'idle') as JobState,
-            trayStatus: str(d.trayStatus), discId: str(d.discId), artist: str(d.artist), album: str(d.album), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
+            trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), artist: str(d.artist), album: str(d.album), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
             progressPercent: num(d.progressPercent), currentFile: str(d.currentFile), error: str(d.error),
           }));
         }

@@ -1,5 +1,6 @@
 // Original file: src/rippy.proto
 
+import type { TrackMetadata as _rippy_v1_TrackMetadata, TrackMetadata__Output as _rippy_v1_TrackMetadata__Output } from '../../rippy/v1/TrackMetadata';
 
 export interface DriveState {
   'device'?: (string);
@@ -14,6 +15,7 @@ export interface DriveState {
   'currentFile'?: (string);
   'error'?: (string);
   'trayStatus'?: (string);
+  'tracks'?: (_rippy_v1_TrackMetadata)[];
   '_trayStatus'?: "trayStatus";
   '_discId'?: "discId";
   '_artist'?: "artist";
@@ -38,6 +40,7 @@ export interface DriveState__Output {
   'currentFile'?: (string);
   'error'?: (string);
   'trayStatus'?: (string);
+  'tracks': (_rippy_v1_TrackMetadata__Output)[];
   '_trayStatus'?: "trayStatus";
   '_discId'?: "discId";
   '_artist'?: "artist";

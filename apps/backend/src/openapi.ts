@@ -171,6 +171,7 @@ export const openApiDocument = {
           discId: { type: 'string' },
           artist: { type: 'string' },
           album: { type: 'string' },
+          tracks: { type: 'array', items: { $ref: '#/components/schemas/TrackMetadata' } },
           currentTrack: { type: 'integer', minimum: 1 },
           totalTracks: { type: 'integer', minimum: 1 },
           progressPercent: { type: 'number', minimum: 0, maximum: 100 },
@@ -178,6 +179,14 @@ export const openApiDocument = {
           lastSeenAt: { type: 'string', format: 'date-time' },
           logs: { type: 'array', items: { type: 'string' } },
           error: { type: 'string' },
+        },
+      },
+      TrackMetadata: {
+        type: 'object',
+        required: ['number', 'title'],
+        properties: {
+          number: { type: 'integer', minimum: 1 },
+          title: { type: 'string' },
         },
       },
       HistoryJob: {

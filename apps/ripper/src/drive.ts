@@ -44,8 +44,8 @@ export async function probeDrive(device: string): Promise<DriveProbe> {
     if (sg.code === 0) return { mediaStatus: 'present', trayStatus: 'closed' };
   }
 
-  const discid = await runProbeCommand('cd-discid', ['-q', '-d', device, 'discid'], 3000);
-  if (discid.code === 0) return { mediaStatus: 'present', trayStatus: 'closed' };
+  const discid = await runProbeCommand('cd-discid', [device], 3000);
+  if (/^[a-fA-F0-9]+\s+\d+\s+/.test(discid.output.trim())) return { mediaStatus: 'present', trayStatus: 'closed' };
   return { mediaStatus: 'absent', trayStatus: 'unknown' };
 }
 

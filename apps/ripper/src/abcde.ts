@@ -59,9 +59,11 @@ function removeAbcdeResumeDir(device: string, outputDir: string): string | undef
 }
 
 function readDiscId(device: string): string | undefined {
-  const result = spawnSync('cd-discid', ['-q', '-d', device, 'discid'], { encoding: 'utf8' });
+  const result = spawnSync('cd-discid', [device], { encoding: 'utf8', timeout: 5000 });
   if (result.status !== 0) return undefined;
-  const discId = result.stdout.trim().split(/\s+/)[0];
+  const output = result.stdout.trim();
+  if (!/^[a-fA-F0-9]+\s+\d+\s+/.test(output)) return undefined;
+  const discId = output.split(/\s+/)[0];
   return discId && /^[a-fA-F0-9]+$/.test(discId) ? discId.toLowerCase() : undefined;
 }
 

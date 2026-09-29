@@ -31,8 +31,11 @@ x-ripper-common: &ripper-common
   environment:
     BACKEND_GRPC_ADDR: backend:50051
     OUTPUT_DIR: /music
+    WORK_DIR: /work
     OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
     AUTO_RIP: ${AUTO_RIP:-true}
+    EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+    EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
     UDEV_MONITOR: ${UDEV_MONITOR:-true}
     POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
     LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -42,6 +45,9 @@ x-ripper-common: &ripper-common
     - type: bind
       source: ${MUSIC_DIR:-./data/music}
       target: /music
+    - type: bind
+      source: ${WORK_DIR:-./data/work}
+      target: /work
     - type: bind
       source: /run/udev
       target: /run/udev
@@ -113,8 +119,11 @@ services:
     environment:
       BACKEND_GRPC_ADDR: backend:50051
       OUTPUT_DIR: /music
+      WORK_DIR: /work
       OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
       AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
       UDEV_MONITOR: ${UDEV_MONITOR:-true}
       POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -133,8 +142,11 @@ services:
     environment:
       BACKEND_GRPC_ADDR: backend:50051
       OUTPUT_DIR: /music
+      WORK_DIR: /work
       OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
       AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
       UDEV_MONITOR: ${UDEV_MONITOR:-true}
       POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -152,8 +164,11 @@ services:
     environment:
       BACKEND_GRPC_ADDR: backend:50051
       OUTPUT_DIR: /music
+      WORK_DIR: /work
       OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
       AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
       UDEV_MONITOR: ${UDEV_MONITOR:-true}
       POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}

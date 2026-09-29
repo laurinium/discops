@@ -17,9 +17,12 @@ export const RipperEnv = z.object({
   DRIVE_DEVICE: z.string().min(1).default('/dev/sr0'),
   BACKEND_GRPC_ADDR: z.string().default('backend:50051'),
   OUTPUT_DIR: z.string().default('/music'),
+  WORK_DIR: z.string().default('/work'),
   ABCDE_CONFIG: z.string().optional(),
   OUTPUT_FORMAT: z.string().default('flac'),
   AUTO_RIP: boolish.default('true'),
+  EJECT_ON_SUCCESS: boolish.default('true'),
+  EJECT_ON_FAILURE: boolish.default('false'),
   UDEV_MONITOR: boolish.default('true'),
   POLL_INTERVAL_MS: z.coerce.number().default(5000),
 });

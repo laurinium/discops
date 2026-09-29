@@ -1,14 +1,20 @@
-# Example abcde config. Mount as /etc/abcde.conf and set ABCDE_CONFIG=/etc/abcde.conf.
-OUTPUTTYPE=flac
-OUTPUTDIR=/music
+# Example abcde config. The ripper now generates a per-job abcde.conf under /work/<job-id>.
+# This file is retained as a reference for custom deployments.
+CDDBMETHOD=musicbrainz
 INTERACTIVE=n
 CDDBLOCALRECURSIVE=n
-EJECTCD=y
-PADTRACKS=y
-MAXPROCS=2
+NOSUBMIT=y
 CDROMREADERSYNTAX=cdparanoia
 CDPARANOIA=cdparanoia
+CDPARANOIAOPTS="-z=100 -X"
 CDDISCID=cd-discid
+OUTPUTTYPE=flac
+FLACENCODERSYNTAX=flac
 FLAC=flac
+FLACOPTS="-8 -V"
+PADTRACKS=y
+MAXPROCS=2
+ACTIONS=musicbrainz,read,encode,tag,move,clean
+OUTPUTDIR=/music
 OUTPUTFORMAT='${ARTISTFILE}/${ALBUMFILE}/${TRACKNUM} - ${TRACKFILE}'
-VAOUTPUTFORMAT='Various/${ALBUMFILE}/${TRACKNUM} - ${ARTISTFILE} - ${TRACKFILE}'
+VAOUTPUTFORMAT='Various Artists/${ALBUMFILE}/${TRACKNUM} - ${ARTISTFILE} - ${TRACKFILE}'

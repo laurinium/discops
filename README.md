@@ -128,11 +128,28 @@ docker compose --profile sr1 up -d --build
 
 ## abcde configuration
 
-The ripper invokes `abcde` with process args, not shell strings. It runs in noninteractive verbose mode:
+The ripper invokes `abcde` with process args, not shell strings. The audio pipeline follows ARM's abcde-based approach while keeping Rippymcripface in charge of job state, validation, publishing, and ejects.
+
+For each job the ripper creates an isolated work directory under `/work/<job-id>` containing `abcde.conf`, WAV/temp data, staging output, and logs. abcde runs in noninteractive verbose mode:
 
 ```bash
-abcde -N -V -d /dev/sr0 -o flac
+abcde -N -V -d /dev/sr0 -c /work/<job-id>/abcde.conf
 ```
+
+Generated config includes MusicBrainz, cdparanoia, FLAC verification, padded tracks, and no abcde eject handling:
+
+```conf
+CDDBMETHOD=musicbrainz
+INTERACTIVE=n
+CDROMREADERSYNTAX=cdparanoia
+OUTPUTTYPE=flac
+FLACENCODERSYNTAX=flac
+CDPARANOIAOPTS="-z=100 -X"
+FLACOPTS="-8 -V"
+ACTIONS=musicbrainz,read,encode,tag,move,clean
+```
+
+abcde writes to job staging first. The app validates abcde exit status, expected track count, FLAC count, and `flac -t` before atomically publishing to `/music`. Existing library paths are never overwritten.
 
 Config knobs:
 

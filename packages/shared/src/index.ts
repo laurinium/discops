@@ -9,6 +9,12 @@ export const jobStates = [
   'encoding',
   'completed',
   'failed',
+  'failed-metadata',
+  'failed-read',
+  'failed-encode',
+  'failed-verify',
+  'failed-finalize',
+  'failed-interrupted',
   'cancelled',
   'ejected',
   'unsupported',
@@ -62,17 +68,23 @@ export interface HistoryJob {
 
 export function canTransition(from: JobState, to: JobState): boolean {
   if (from === to) return true;
-  const terminal: JobState[] = ['completed', 'failed', 'cancelled', 'ejected', 'unsupported'];
+  const terminal: JobState[] = ['completed', 'failed', 'failed-metadata', 'failed-read', 'failed-encode', 'failed-verify', 'failed-finalize', 'failed-interrupted', 'cancelled', 'ejected', 'unsupported'];
   if (terminal.includes(from)) return to === 'disc-detected' || to === 'idle';
   const allowed: Record<JobState, JobState[]> = {
     idle: ['disc-detected', 'ready'],
-    'disc-detected': ['reading-metadata', 'ready', 'ripping', 'unsupported', 'ejected', 'failed'],
-    'reading-metadata': ['ready', 'ripping', 'failed', 'unsupported', 'ejected'],
+    'disc-detected': ['reading-metadata', 'ready', 'ripping', 'unsupported', 'ejected', 'failed', 'failed-metadata'],
+    'reading-metadata': ['ready', 'ripping', 'failed', 'failed-metadata', 'unsupported', 'ejected'],
     ready: ['ripping', 'ejected', 'failed'],
-    ripping: ['encoding', 'completed', 'failed', 'cancelled', 'ejected'],
-    encoding: ['completed', 'failed', 'cancelled', 'ejected'],
+    ripping: ['encoding', 'completed', 'failed', 'failed-read', 'failed-encode', 'failed-verify', 'failed-finalize', 'cancelled', 'ejected'],
+    encoding: ['completed', 'failed', 'failed-encode', 'failed-verify', 'failed-finalize', 'cancelled', 'ejected'],
     completed: ['idle', 'disc-detected'],
     failed: ['idle', 'disc-detected'],
+    'failed-metadata': ['idle', 'disc-detected'],
+    'failed-read': ['idle', 'disc-detected'],
+    'failed-encode': ['idle', 'disc-detected'],
+    'failed-verify': ['idle', 'disc-detected'],
+    'failed-finalize': ['idle', 'disc-detected'],
+    'failed-interrupted': ['idle', 'disc-detected'],
     cancelled: ['idle', 'disc-detected'],
     ejected: ['idle', 'disc-detected'],
     unsupported: ['idle', 'disc-detected'],

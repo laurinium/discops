@@ -1,42 +1,87 @@
-import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
-import path from 'node:path';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createWriteStream, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
+import type { Writable } from 'node:stream';
+import {
+  atomicPublish,
+  createJobPaths,
+  prepareFreshJob,
+  readTrackExpectation,
+  validateCompletedRip,
+  writeArmAbcdeConfig,
+  type ArmFailureType,
+  type JobPaths,
+} from './armAudio.js';
 
-export interface AbcdeOptions { device: string; outputDir: string; configPath?: string; outputFormat: string; }
-export interface Progress { currentTrack?: number; totalTracks?: number; progressPercent?: number; currentFile?: string; }
+export interface AbcdeOptions { device: string; outputDir: string; workDir: string; outputFormat: string; }
+export interface Progress { currentTrack?: number; totalTracks?: number; progressPercent?: number; currentFile?: string; phase?: string; }
+
+export interface RipFailure { jobId: string; error: string; failureType: ArmFailureType; exitCode?: number | null; signal?: NodeJS.Signals | null; }
 
 export class AbcdeRunner extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | undefined;
+  private childPid: number | undefined;
   private cancelled = false;
+  private currentJobId: string | undefined;
+  private currentPaths: JobPaths | undefined;
   get running(): boolean { return this.child !== undefined; }
 
   start(opts: AbcdeOptions): string {
     if (this.child) throw new Error('abcde already running');
     this.cancelled = false;
     const jobId = crypto.randomUUID();
-    const removedResumeDir = removeAbcdeResumeDir(opts.device, opts.outputDir);
-    const args = ['-N', '-V', '-d', opts.device, '-o', opts.outputFormat];
-    if (opts.configPath) args.push('-c', opts.configPath);
-    const env = { ...process.env, TERM: process.env.TERM ?? 'dumb', OUTPUTDIR: opts.outputDir };
-    this.child = spawn('abcde', args, { env, cwd: opts.outputDir, shell: false });
-    this.emit('started', jobId);
-    if (removedResumeDir) this.emit('log', { jobId, stream: 'stdout', line: `Removed stale abcde resume directory: ${removedResumeDir}` });
-    const onLine = (stream: 'stdout' | 'stderr', data: Buffer) => {
+    const paths = createJobPaths(opts.workDir, jobId);
+    prepareFreshJob(paths);
+    writeArmAbcdeConfig(paths, opts.outputFormat);
+    writeFileSync(`${paths.workDir}/RUNNING`, new Date().toISOString());
+    const expectation = readTrackExpectation(opts.device);
+    writeFileSync(`${paths.workDir}/job.json`, JSON.stringify({ jobId, device: opts.device, discId: expectation.discId, expectedTracks: expectation.expectedTracks, startedAt: new Date().toISOString() }, null, 2));
+
+    const args = ['-N', '-V', '-d', opts.device, '-c', paths.abcdeConfig];
+    const env = { ...process.env, TERM: process.env.TERM ?? 'dumb' };
+    this.child = spawn('abcde', args, { env, cwd: paths.workDir, shell: false, detached: true });
+    this.childPid = this.child.pid;
+    this.currentJobId = jobId;
+    this.currentPaths = paths;
+    const stdoutLog = createWriteStream(paths.stdoutLog, { flags: 'a' });
+    const stderrLog = createWriteStream(paths.stderrLog, { flags: 'a' });
+    this.emit('started', { jobId, expectedTracks: expectation.expectedTracks, discId: expectation.discId, workDir: paths.workDir });
+
+    const onLine = (stream: 'stdout' | 'stderr', log: Writable, data: Buffer) => {
+      log.write(data);
       for (const line of data.toString('utf8').split(/\r?\n/).filter(Boolean)) {
         this.emit('log', { jobId, stream, line });
         const progress = parseProgress(line);
         if (progress) this.emit('progress', { jobId, ...progress });
       }
     };
-    this.child.stdout.on('data', (d: Buffer) => onLine('stdout', d));
-    this.child.stderr.on('data', (d: Buffer) => onLine('stderr', d));
-    this.child.on('error', (err) => { this.child = undefined; this.emit('failed', { jobId, error: err.message }); });
+    this.child.stdout.on('data', (d: Buffer) => onLine('stdout', stdoutLog, d));
+    this.child.stderr.on('data', (d: Buffer) => onLine('stderr', stderrLog, d));
+    this.child.on('error', (err) => this.fail(jobId, paths, 'UNKNOWN_ERROR', err.message));
     this.child.on('exit', (code, signal) => {
+      stdoutLog.end();
+      stderrLog.end();
       this.child = undefined;
-      if (this.cancelled) this.emit('cancelled', { jobId });
-      else if (code === 0) this.emit('completed', { jobId });
-      else this.emit('failed', { jobId, error: `abcde exited code=${code} signal=${signal ?? ''}` });
+      this.childPid = undefined;
+      if (this.cancelled) {
+        this.markTerminal(paths, 'CANCELLED');
+        this.emit('cancelled', { jobId });
+        return;
+      }
+      const validation = validateCompletedRip(paths, expectation.expectedTracks, code);
+      if (!validation.ok) {
+        this.fail(jobId, paths, validation.failureType ?? 'UNKNOWN_ERROR', validation.error ?? `abcde exited code=${code} signal=${signal ?? ''}`, code, signal);
+        return;
+      }
+      try {
+        this.emit('progress', { jobId, phase: 'FINALIZING', progressPercent: 99 });
+        atomicPublish(paths, opts.outputDir);
+        this.markTerminal(paths, 'COMPLETED');
+        rmSync(paths.wavDir, { recursive: true, force: true });
+        this.emit('completed', { jobId, expectedTracks: validation.expectedTracks, completedTracks: validation.completedTracks });
+      } catch (err) {
+        this.fail(jobId, paths, 'FAILED_FINALIZE', err instanceof Error ? err.message : String(err), code, signal);
+      }
     });
     return jobId;
   }
@@ -44,38 +89,39 @@ export class AbcdeRunner extends EventEmitter {
   cancel(): void {
     if (!this.child) return;
     this.cancelled = true;
-    this.child.kill('SIGTERM');
-    setTimeout(() => this.child?.kill('SIGKILL'), 10_000).unref();
+    this.terminateProcessGroup('SIGTERM');
+    setTimeout(() => this.terminateProcessGroup('SIGKILL'), 10_000).unref();
   }
-}
 
-function removeAbcdeResumeDir(device: string, outputDir: string): string | undefined {
-  const discId = readDiscId(device);
-  if (!discId) return undefined;
-  const resumeDir = path.join(outputDir, `abcde.${discId}`);
-  if (!existsSync(resumeDir)) return undefined;
-  rmSync(resumeDir, { recursive: true, force: true });
-  return resumeDir;
-}
+  private terminateProcessGroup(signal: NodeJS.Signals): void {
+    if (!this.childPid) return;
+    try { process.kill(-this.childPid, signal); } catch { this.child?.kill(signal); }
+  }
 
-function readDiscId(device: string): string | undefined {
-  const result = spawnSync('cd-discid', [device], { encoding: 'utf8', timeout: 5000 });
-  if (result.status !== 0) return undefined;
-  const output = result.stdout.trim();
-  if (!/^[a-fA-F0-9]+\s+\d+\s+/.test(output)) return undefined;
-  const discId = output.split(/\s+/)[0];
-  return discId && /^[a-fA-F0-9]+$/.test(discId) ? discId.toLowerCase() : undefined;
+  private fail(jobId: string, paths: JobPaths, failureType: ArmFailureType, error: string, exitCode?: number | null, signal?: NodeJS.Signals | null): void {
+    this.child = undefined;
+    this.childPid = undefined;
+    this.markTerminal(paths, 'FAILED');
+    this.emit('failed', { jobId, error, failureType, ...(exitCode !== undefined ? { exitCode } : {}), ...(signal !== undefined ? { signal } : {}) } satisfies RipFailure);
+  }
+
+  private markTerminal(paths: JobPaths, marker: 'COMPLETED' | 'FAILED' | 'CANCELLED'): void {
+    if (existsSync(`${paths.workDir}/RUNNING`)) rmSync(`${paths.workDir}/RUNNING`, { force: true });
+    writeFileSync(`${paths.workDir}/${marker}`, new Date().toISOString());
+  }
 }
 
 export function parseProgress(line: string): Progress | undefined {
   const track = line.match(/track\s+(\d+)\s+of\s+(\d+)/i) ?? line.match(/Track\s+(\d+)\/(\d+)/i) ?? line.match(/Grabbing track\s+(\d+)/i);
   const pct = line.match(/(\d{1,3}(?:\.\d+)?)%/);
-  const file = line.match(/(?:output|encoding|ripping).*?([^/\s]+\.(?:flac|mp3|ogg|m4a|wav))/i);
-  if (!track && !pct && !file) return undefined;
+  const file = line.match(/(?:outputting to|output|encoding|ripping).*?([^/\s]+\.(?:flac|mp3|ogg|m4a|wav))/i);
+  const phase = /encoding/i.test(line) ? 'ENCODING' : /tagging/i.test(line) ? 'TAGGING' : /grabbing|ripping|outputting/i.test(line) ? 'RIPPING' : undefined;
+  if (!track && !pct && !file && !phase) return undefined;
   const progress: Progress = {};
   if (track?.[1]) progress.currentTrack = Number(track[1]);
   if (track?.[2]) progress.totalTracks = Number(track[2]);
   if (pct?.[1]) progress.progressPercent = Math.min(100, Number(pct[1]));
   if (file?.[1]) progress.currentFile = file[1];
+  if (phase) progress.phase = phase;
   return progress;
 }

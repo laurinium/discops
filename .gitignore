@@ -7,5 +7,7 @@ coverage
 *.db-*
 data/music/*
 data/backend/*
+data/work/*
 !data/music/.gitkeep
 !data/backend/.gitkeep
+!data/work/.gitkeep

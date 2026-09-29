@@ -3,11 +3,22 @@ import type { RipperConfig } from '@rippy/config';
 import type { JobState, TrackMetadata } from '@rippy/shared';
 import { AbcdeRunner } from './abcde.js';
 import { BackendClient, driveState } from './client.js';
+import { markInterruptedJobs } from './armAudio.js';
 import { probeDrive, UdevMonitor, type TrayStatus } from './drive.js';
 
 type Logger = { info(o: object): void; warn(o: object): void; error(o: object): void };
 
 type BackendCommand = { startRip?: object; cancelRip?: { reason?: string }; ejectDisc?: object; refreshDisc?: object };
+
+function failureTypeToState(failureType?: string): JobState {
+  if (failureType === 'FAILED_METADATA') return 'failed-metadata';
+  if (failureType === 'FAILED_READ') return 'failed-read';
+  if (failureType === 'FAILED_ENCODE') return 'failed-encode';
+  if (failureType === 'FAILED_VERIFY') return 'failed-verify';
+  if (failureType === 'FAILED_FINALIZE') return 'failed-finalize';
+  if (failureType === 'FAILED_INTERRUPTED') return 'failed-interrupted';
+  return 'failed';
+}
 
 export class RipperController {
   private abcde = new AbcdeRunner();
@@ -28,6 +39,9 @@ export class RipperController {
   }
 
   start(): void {
+    for (const jobId of markInterruptedJobs(this.config.WORK_DIR)) {
+      this.log.warn({ event: 'job_marked_interrupted', jobId, device: this.config.DRIVE_DEVICE });
+    }
     this.client.start();
     if (this.config.UDEV_MONITOR) {
       this.udev = new UdevMonitor(this.config.DRIVE_DEVICE);
@@ -47,12 +61,13 @@ export class RipperController {
   }
 
   private wireAbcde(): void {
-    this.abcde.on('started', (jobId: string) => {
+    this.abcde.on('started', ({ jobId, expectedTracks, discId, workDir }: { jobId: string; expectedTracks: number; discId?: string; workDir: string }) => {
       this.activeJobId = jobId;
       this.artist = undefined;
       this.album = undefined;
       this.tracks = [];
-      this.setState('reading-metadata');
+      this.setState('reading-metadata', { totalTracks: expectedTracks, discId });
+      this.log.info({ event: 'rip_started', jobId, expectedTracks, discId, workDir, device: this.config.DRIVE_DEVICE });
       this.client.send({ ripEvent: { type: 'RIP_STARTED', jobId } });
     });
     this.abcde.on('log', (l: { jobId: string; stream: string; line: string }) => {
@@ -63,12 +78,19 @@ export class RipperController {
       this.setState('ripping', p);
       this.client.send({ ripEvent: { type: 'RIP_PROGRESS', ...p } });
     });
-    this.abcde.on('completed', ({ jobId }: { jobId: string }) => {
-      this.setState('completed', { progressPercent: 100 });
+    this.abcde.on('completed', ({ jobId, expectedTracks, completedTracks }: { jobId: string; expectedTracks: number; completedTracks: number }) => {
+      this.log.info({ event: 'rip_completed', jobId, expectedTracks, completedTracks, device: this.config.DRIVE_DEVICE });
+      this.setState('completed', { progressPercent: 100, totalTracks: expectedTracks });
       this.client.send({ ripEvent: { type: 'RIP_COMPLETED', jobId } });
-      this.openTrayAfterCompletion();
+      if (this.config.EJECT_ON_SUCCESS) this.openTrayAfterCompletion();
     });
-    this.abcde.on('failed', ({ jobId, error }: { jobId: string; error: string }) => { this.setState('failed', { error }); this.client.send({ ripEvent: { type: 'RIP_FAILED', jobId, error } }); });
+    this.abcde.on('failed', ({ jobId, error, failureType }: { jobId: string; error: string; failureType?: string }) => {
+      this.log.error({ event: 'rip_failed', jobId, failureType, error, device: this.config.DRIVE_DEVICE });
+      const message = failureType ? `${failureType}: ${error}` : error;
+      this.setState(failureTypeToState(failureType), { error: message });
+      this.client.send({ ripEvent: { type: 'RIP_FAILED', jobId, error: message } });
+      if (this.config.EJECT_ON_FAILURE) this.openTrayAfterCompletion();
+    });
     this.abcde.on('cancelled', ({ jobId }: { jobId: string }) => { this.setState('cancelled'); this.client.send({ ripEvent: { type: 'RIP_CANCELLED', jobId } }); });
   }
 
@@ -128,7 +150,7 @@ export class RipperController {
     this.abcde.start({
       device: this.config.DRIVE_DEVICE,
       outputDir: this.config.OUTPUT_DIR,
-      ...(this.config.ABCDE_CONFIG ? { configPath: this.config.ABCDE_CONFIG } : {}),
+      workDir: this.config.WORK_DIR,
       outputFormat: this.config.OUTPUT_FORMAT,
     });
   }

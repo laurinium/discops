@@ -110,6 +110,46 @@ function classifyAbcdeFailure(paths: JobPaths): ArmFailureType {
   return 'UNKNOWN_ERROR';
 }
 
+function pathHasFileCollision(src: string, dest: string): boolean {
+  if (!existsSync(dest)) return false;
+  const srcStat = statSync(src);
+  const destStat = statSync(dest);
+  if (srcStat.isFile()) return destStat.isFile() || destStat.isDirectory();
+  if (!srcStat.isDirectory()) return true;
+  if (!destStat.isDirectory()) return true;
+  return readdirSync(src).some((entry) => pathHasFileCollision(path.join(src, entry), path.join(dest, entry)));
+}
+
+function uniqueSiblingPath(dest: string, suffix: string): string {
+  const parsed = path.parse(dest);
+  for (let i = 0; i < 100; i++) {
+    const candidate = path.join(parsed.dir, `${parsed.name}${suffix}${i === 0 ? '' : ` ${i}`}${parsed.ext}`);
+    if (!existsSync(candidate)) return candidate;
+  }
+  throw new Error(`could not find unique publish path for ${dest}`);
+}
+
+function publishNode(src: string, requestedDest: string, collisionSuffix: string, depth: number): void {
+  const srcStat = statSync(src);
+  if (srcStat.isFile()) {
+    if (existsSync(requestedDest)) throw new Error(`refusing to overwrite existing library file ${requestedDest}`);
+    mkdirSync(path.dirname(requestedDest), { recursive: true });
+    renameSync(src, requestedDest);
+    return;
+  }
+  if (!srcStat.isDirectory()) return;
+
+  let dest = requestedDest;
+  if (depth > 0 && pathHasFileCollision(src, requestedDest)) {
+    dest = uniqueSiblingPath(requestedDest, collisionSuffix);
+  }
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src)) {
+    publishNode(path.join(src, entry), path.join(dest, entry), collisionSuffix, depth + 1);
+  }
+  rmSync(src, { recursive: true, force: true });
+}
+
 function safeRead(file: string): string { try { return readFileSync(file, 'utf8'); } catch { return ''; } }
 
 export function sanitizePathSegment(input: string): string {
@@ -145,11 +185,6 @@ export function atomicPublish(paths: JobPaths, libraryDir: string): void {
   if (topEntries.length === 0) throw new Error('nothing to publish');
   mkdirSync(libraryDir, { recursive: true });
 
-  for (const entry of topEntries) {
-    const dest = path.join(libraryDir, entry);
-    if (existsSync(dest)) throw new Error(`refusing to overwrite existing library path ${dest}`);
-  }
-
   // /work and /music may be different mounts. Cross-device rename is impossible,
   // so copy to a hidden staging directory inside the final library filesystem,
   // then perform same-filesystem renames into the visible library paths.
@@ -164,8 +199,9 @@ export function atomicPublish(paths: JobPaths, libraryDir: string): void {
         errorOnExist: true,
       });
     }
+    const collisionSuffix = ` [${path.basename(paths.workDir).slice(0, 8)}]`;
     for (const entry of topEntries) {
-      renameSync(path.join(libraryStaging, entry), path.join(libraryDir, entry));
+      publishNode(path.join(libraryStaging, entry), path.join(libraryDir, entry), collisionSuffix, 0);
     }
     rmSync(libraryStaging, { recursive: true, force: true });
   } catch (err) {

@@ -38,8 +38,10 @@ describe('ARM-style audio orchestration helpers', () => {
     expect(validation.ok).toBe(true);
     const library = path.join(root, 'music');
     atomicPublish(paths, library);
-    expect(() => atomicPublish(paths, library)).toThrow(/overwrite/);
-    expect(() => readdirSync(library).find((entry) => entry.startsWith('.rippy-staging-'))).not.toThrow();
+    expect(readdirSync(library).find((entry) => entry.startsWith('.rippy-staging-'))).toBeUndefined();
+    const secondDisc = makeFlacs(12);
+    atomicPublish(secondDisc, library);
+    expect(readdirSync(path.join(library, 'Artist')).sort()).toEqual(['Album', 'Album [job-a]']);
   });
 
   it('fails partial read output and publishes nothing', () => {

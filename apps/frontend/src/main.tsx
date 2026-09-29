@@ -62,7 +62,7 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
       <div className="summary">
         <div className="statusLine">{statusText(drive)}</div>
         <div className="albumTitle">{drive.album ?? (drive.mediaPresent ? 'Metadata pending…' : 'No album loaded')}</div>
-        <div className="artistName">{drive.artist ?? 'Unknown artist'}</div>
+        <div className="artistName">{drive.artist ?? 'Unknown artist'}{drive.discNumber ? ` · Disc ${drive.discNumber}${drive.totalDiscs ? `/${drive.totalDiscs}` : ''}` : ''}</div>
       </div>
     </div>
 
@@ -70,6 +70,8 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
       <dt>Status</dt><dd>{drive.state}</dd>
       <dt>Media</dt><dd>{drive.mediaPresent ? 'present' : 'none'}</dd>
       <dt>Tray</dt><dd>{drive.trayStatus ?? 'unknown'}</dd>
+      {drive.discNumber && <><dt>Disc</dt><dd>{drive.discNumber}{drive.totalDiscs ? ` / ${drive.totalDiscs}` : ''}</dd></>}
+      {drive.releaseDate && <><dt>Released</dt><dd>{drive.releaseDate}</dd></>}
       {drive.currentTrack && <><dt>Track</dt><dd>{drive.currentTrack} / {drive.totalTracks ?? (tracks.length || '?')}</dd></>}
       {drive.currentFile && <><dt>Current</dt><dd>{drive.currentFile}</dd></>}
       {drive.error && <><dt>Error</dt><dd className="badText">{drive.error}</dd></>}

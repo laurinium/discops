@@ -10,11 +10,25 @@ export interface RipEvent {
   'progressPercent'?: (number | string);
   'currentFile'?: (string);
   'error'?: (string);
+  'artist'?: (string);
+  'album'?: (string);
+  'releaseDate'?: (string);
+  'musicBrainzDiscId'?: (string);
+  'musicBrainzReleaseId'?: (string);
+  'discNumber'?: (number);
+  'totalDiscs'?: (number);
   '_currentTrack'?: "currentTrack";
   '_totalTracks'?: "totalTracks";
   '_progressPercent'?: "progressPercent";
   '_currentFile'?: "currentFile";
   '_error'?: "error";
+  '_artist'?: "artist";
+  '_album'?: "album";
+  '_releaseDate'?: "releaseDate";
+  '_musicBrainzDiscId'?: "musicBrainzDiscId";
+  '_musicBrainzReleaseId'?: "musicBrainzReleaseId";
+  '_discNumber'?: "discNumber";
+  '_totalDiscs'?: "totalDiscs";
 }
 
 export interface RipEvent__Output {
@@ -25,9 +39,23 @@ export interface RipEvent__Output {
   'progressPercent'?: (number);
   'currentFile'?: (string);
   'error'?: (string);
+  'artist'?: (string);
+  'album'?: (string);
+  'releaseDate'?: (string);
+  'musicBrainzDiscId'?: (string);
+  'musicBrainzReleaseId'?: (string);
+  'discNumber'?: (number);
+  'totalDiscs'?: (number);
   '_currentTrack'?: "currentTrack";
   '_totalTracks'?: "totalTracks";
   '_progressPercent'?: "progressPercent";
   '_currentFile'?: "currentFile";
   '_error'?: "error";
+  '_artist'?: "artist";
+  '_album'?: "album";
+  '_releaseDate'?: "releaseDate";
+  '_musicBrainzDiscId'?: "musicBrainzDiscId";
+  '_musicBrainzReleaseId'?: "musicBrainzReleaseId";
+  '_discNumber'?: "discNumber";
+  '_totalDiscs'?: "totalDiscs";
 }

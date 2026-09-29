@@ -55,6 +55,11 @@ message DriveState {
   optional string disc_id = 4;
   optional string artist = 5;
   optional string album = 6;
+  optional string release_date = 14;
+  optional string music_brainz_disc_id = 15;
+  optional string music_brainz_release_id = 16;
+  optional uint32 disc_number = 17;
+  optional uint32 total_discs = 18;
   optional uint32 current_track = 7;
   optional uint32 total_tracks = 8;
   optional double progress_percent = 9;
@@ -94,6 +99,13 @@ message RipEvent {
   optional double progress_percent = 5;
   optional string current_file = 6;
   optional string error = 7;
+  optional string artist = 8;
+  optional string album = 9;
+  optional string release_date = 10;
+  optional string music_brainz_disc_id = 11;
+  optional string music_brainz_release_id = 12;
+  optional uint32 disc_number = 13;
+  optional uint32 total_discs = 14;
 }
 
 message RipLog {

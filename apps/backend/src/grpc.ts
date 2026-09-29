@@ -69,7 +69,9 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const d = msg.driveState as Event;
           state.patch(ripperId, defined<Partial<DriveSnapshot>>({
             device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: (str(d.state) ?? 'idle') as JobState,
-            trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), artist: str(d.artist), album: str(d.album), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
+            trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), artist: str(d.artist), album: str(d.album),
+            releaseDate: str(d.releaseDate), musicBrainzDiscId: str(d.musicBrainzDiscId), musicBrainzReleaseId: str(d.musicBrainzReleaseId),
+            discNumber: num(d.discNumber), totalDiscs: num(d.totalDiscs), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
             progressPercent: num(d.progressPercent), currentFile: str(d.currentFile), error: str(d.error),
           }));
         }
@@ -90,7 +92,11 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const type = str(r.type);
           const jobId = str(r.jobId) ?? 'unknown';
           if (type === 'RIP_STARTED') state.recordJob(defined<HistoryJob>({ id: jobId, ripperId, device: state.listDrives().find((d) => d.ripperId === ripperId)?.device ?? 'unknown', state: 'ripping', startedAt: new Date().toISOString() }));
-          if (type === 'RIP_PROGRESS') state.patch(ripperId, defined<Partial<DriveSnapshot>>({ state: 'ripping', currentTrack: num(r.currentTrack), totalTracks: num(r.totalTracks), progressPercent: num(r.progressPercent), currentFile: str(r.currentFile) }));
+          if (type === 'RIP_PROGRESS') state.patch(ripperId, defined<Partial<DriveSnapshot>>({
+            state: 'ripping', currentTrack: num(r.currentTrack), totalTracks: num(r.totalTracks), progressPercent: num(r.progressPercent), currentFile: str(r.currentFile),
+            artist: str(r.artist), album: str(r.album), releaseDate: str(r.releaseDate), musicBrainzDiscId: str(r.musicBrainzDiscId), musicBrainzReleaseId: str(r.musicBrainzReleaseId),
+            discNumber: num(r.discNumber), totalDiscs: num(r.totalDiscs),
+          }));
           if (type === 'RIP_COMPLETED') { state.patch(ripperId, { state: 'completed', progressPercent: 100 }); state.finishJob(jobId, 'completed'); }
           if (type === 'RIP_FAILED') { state.patch(ripperId, defined<Partial<DriveSnapshot>>({ state: 'failed', error: str(r.error) })); state.finishJob(jobId, 'failed', str(r.error)); }
           if (type === 'RIP_CANCELLED') { state.patch(ripperId, { state: 'cancelled' }); state.finishJob(jobId, 'cancelled'); }

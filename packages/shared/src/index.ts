@@ -44,6 +44,11 @@ export interface DriveSnapshot {
   discId?: string;
   artist?: string;
   album?: string;
+  releaseDate?: string;
+  musicBrainzDiscId?: string;
+  musicBrainzReleaseId?: string;
+  discNumber?: number;
+  totalDiscs?: number;
   tracks?: TrackMetadata[];
   currentTrack?: number;
   totalTracks?: number;

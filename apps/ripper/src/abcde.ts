@@ -1,4 +1,6 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync, rmSync } from 'node:fs';
+import path from 'node:path';
 import { EventEmitter } from 'node:events';
 
 export interface AbcdeOptions { device: string; outputDir: string; configPath?: string; outputFormat: string; }
@@ -13,11 +15,13 @@ export class AbcdeRunner extends EventEmitter {
     if (this.child) throw new Error('abcde already running');
     this.cancelled = false;
     const jobId = crypto.randomUUID();
+    const removedResumeDir = removeAbcdeResumeDir(opts.device, opts.outputDir);
     const args = ['-N', '-V', '-d', opts.device, '-o', opts.outputFormat];
     if (opts.configPath) args.push('-c', opts.configPath);
     const env = { ...process.env, TERM: process.env.TERM ?? 'dumb', OUTPUTDIR: opts.outputDir };
     this.child = spawn('abcde', args, { env, cwd: opts.outputDir, shell: false });
     this.emit('started', jobId);
+    if (removedResumeDir) this.emit('log', { jobId, stream: 'stdout', line: `Removed stale abcde resume directory: ${removedResumeDir}` });
     const onLine = (stream: 'stdout' | 'stderr', data: Buffer) => {
       for (const line of data.toString('utf8').split(/\r?\n/).filter(Boolean)) {
         this.emit('log', { jobId, stream, line });
@@ -43,6 +47,22 @@ export class AbcdeRunner extends EventEmitter {
     this.child.kill('SIGTERM');
     setTimeout(() => this.child?.kill('SIGKILL'), 10_000).unref();
   }
+}
+
+function removeAbcdeResumeDir(device: string, outputDir: string): string | undefined {
+  const discId = readDiscId(device);
+  if (!discId) return undefined;
+  const resumeDir = path.join(outputDir, `abcde.${discId}`);
+  if (!existsSync(resumeDir)) return undefined;
+  rmSync(resumeDir, { recursive: true, force: true });
+  return resumeDir;
+}
+
+function readDiscId(device: string): string | undefined {
+  const result = spawnSync('cd-discid', ['-q', '-d', device, 'discid'], { encoding: 'utf8' });
+  if (result.status !== 0) return undefined;
+  const discId = result.stdout.trim().split(/\s+/)[0];
+  return discId && /^[a-fA-F0-9]+$/.test(discId) ? discId.toLowerCase() : undefined;
 }
 
 export function parseProgress(line: string): Progress | undefined {

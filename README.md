@@ -209,6 +209,7 @@ Endpoints:
 - `POST /api/rippers/:ripperId/cancelRip`
 - `POST /api/rippers/:ripperId/ejectDisc` (toggles tray: eject when closed, close when open)
 - `POST /api/rippers/:ripperId/refreshDisc`
+- `POST /api/rippers/:ripperId/resetDrive` (dangerous SCSI device reset; UI requires confirmation)
 
 ## Reliability behavior
 

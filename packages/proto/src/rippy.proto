@@ -27,6 +27,7 @@ message BackendToRipper {
     CancelRip cancel_rip = 11;
     EjectDisc eject_disc = 12;
     RefreshDisc refresh_disc = 13;
+    ResetDrive reset_drive = 14;
   }
 }
 
@@ -105,3 +106,4 @@ message StartRip { optional string job_id = 1; }
 message CancelRip { string reason = 1; }
 message EjectDisc {}
 message RefreshDisc {}
+message ResetDrive {}

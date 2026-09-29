@@ -92,7 +92,7 @@ export const openApiDocument = {
             required: true,
             schema: {
               type: 'string',
-              enum: ['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc'],
+              enum: ['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc', 'resetDrive'],
             },
           },
         ],

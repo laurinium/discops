@@ -4,7 +4,7 @@ import type { DriveSnapshot, HistoryJob, JobState, RipperCommandRequest } from '
 import { RipperCommandSchema } from '@rippy/shared';
 import type { Store } from './store.js';
 
-type Command = { commandId: string; timestampUnixMs: number; startRip?: object; cancelRip?: { reason: string }; ejectDisc?: object; refreshDisc?: object };
+type Command = { commandId: string; timestampUnixMs: number; startRip?: object; cancelRip?: { reason: string }; ejectDisc?: object; refreshDisc?: object; resetDrive?: object };
 type Stream = ServerWritableStream<unknown, Command>;
 
 export class AppState extends EventEmitter {
@@ -44,5 +44,6 @@ export class AppState extends EventEmitter {
     if (req.command === 'cancelRip') stream.write({ ...base, cancelRip: { reason: 'user-request' } });
     if (req.command === 'ejectDisc') stream.write({ ...base, ejectDisc: {} });
     if (req.command === 'refreshDisc') stream.write({ ...base, refreshDisc: {} });
+    if (req.command === 'resetDrive') stream.write({ ...base, resetDrive: {} });
   }
 }

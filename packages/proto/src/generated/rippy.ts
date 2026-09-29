@@ -18,6 +18,7 @@ export interface ProtoGrpcType {
       EjectDisc: MessageTypeDefinition
       Heartbeat: MessageTypeDefinition
       RefreshDisc: MessageTypeDefinition
+      ResetDrive: MessageTypeDefinition
       RipEvent: MessageTypeDefinition
       RipEventType: EnumTypeDefinition
       RipLog: MessageTypeDefinition

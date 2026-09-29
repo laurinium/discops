@@ -130,6 +130,7 @@ services:
       ABCDE_CONFIG: ${ABCDE_CONFIG:-}
       RIPPER_ID: ${RIPPER_SR0_ID:-drive-01}
       DRIVE_DEVICE: ${RIPPER_SR0_DEVICE:-/dev/sr0}
+      SG_DEVICE: ${RIPPER_SR0_SG_DEVICE:-/dev/sg0}
     devices:
       - "${RIPPER_SR0_DEVICE:-/dev/sr0}:${RIPPER_SR0_DEVICE:-/dev/sr0}"
       # Matching SCSI generic device improves cdparanoia/abcde reliability.
@@ -153,6 +154,7 @@ services:
       ABCDE_CONFIG: ${ABCDE_CONFIG:-}
       RIPPER_ID: ${RIPPER_SR1_ID:-drive-02}
       DRIVE_DEVICE: ${RIPPER_SR1_DEVICE:-/dev/sr1}
+      SG_DEVICE: ${RIPPER_SR1_SG_DEVICE:-/dev/sg1}
     devices:
       - "${RIPPER_SR1_DEVICE:-/dev/sr1}:${RIPPER_SR1_DEVICE:-/dev/sr1}"
       - "${RIPPER_SR1_SG_DEVICE:-/dev/sg1}:${RIPPER_SR1_SG_DEVICE:-/dev/sg1}"
@@ -175,6 +177,7 @@ services:
       ABCDE_CONFIG: ${ABCDE_CONFIG:-}
       RIPPER_ID: ${RIPPER_SR2_ID:-drive-03}
       DRIVE_DEVICE: ${RIPPER_SR2_DEVICE:-/dev/sr2}
+      SG_DEVICE: ${RIPPER_SR2_SG_DEVICE:-/dev/sg2}
     devices:
       - "${RIPPER_SR2_DEVICE:-/dev/sr2}:${RIPPER_SR2_DEVICE:-/dev/sr2}"
       - "${RIPPER_SR2_SG_DEVICE:-/dev/sg2}:${RIPPER_SR2_SG_DEVICE:-/dev/sg2}"

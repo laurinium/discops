@@ -15,6 +15,7 @@ export const BackendEnv = z.object({
 export const RipperEnv = z.object({
   RIPPER_ID: z.string().min(1),
   DRIVE_DEVICE: z.string().min(1).default('/dev/sr0'),
+  SG_DEVICE: z.string().optional(),
   BACKEND_GRPC_ADDR: z.string().default('backend:50051'),
   OUTPUT_DIR: z.string().default('/music'),
   WORK_DIR: z.string().default('/work'),

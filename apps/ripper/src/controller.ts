@@ -8,7 +8,7 @@ import { probeDrive, UdevMonitor, type TrayStatus } from './drive.js';
 
 type Logger = { info(o: object): void; warn(o: object): void; error(o: object): void };
 
-type BackendCommand = { startRip?: object; cancelRip?: { reason?: string }; ejectDisc?: object; refreshDisc?: object };
+type BackendCommand = { startRip?: object; cancelRip?: { reason?: string }; ejectDisc?: object; refreshDisc?: object; resetDrive?: object };
 
 function failureTypeToState(failureType?: string): JobState {
   if (failureType === 'FAILED_METADATA') return 'failed-metadata';
@@ -142,6 +142,7 @@ export class RipperController {
     if (command.cancelRip) this.abcde.cancel();
     if (command.ejectDisc) this.eject();
     if (command.refreshDisc) void this.refresh('command');
+    if (command.resetDrive) this.resetDrive();
   }
 
   private startRip(): void {
@@ -164,6 +165,23 @@ export class RipperController {
         this.setState('completed', { progressPercent: 100 });
       }
       setTimeout(() => void this.refresh('completed-eject'), 1500).unref();
+    });
+  }
+
+  private resetDrive(): void {
+    if (this.abcde.running) this.abcde.cancel();
+    const target = this.config.SG_DEVICE ?? this.config.DRIVE_DEVICE;
+    this.log.warn({ event: 'drive_reset_requested', device: this.config.DRIVE_DEVICE, resetDevice: target });
+    this.client.send({ ripLog: { jobId: this.activeJobId ?? 'drive-reset', stream: 'system', line: `Resetting optical drive via sg_reset --device ${target}` } });
+    const child = spawn('sg_reset', ['--device', target], { stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => this.client.send({ ripLog: { jobId: this.activeJobId ?? 'drive-reset', stream: 'system', line: chunk.trim() } }));
+    child.stderr.on('data', (chunk: string) => this.client.send({ ripLog: { jobId: this.activeJobId ?? 'drive-reset', stream: 'system', line: chunk.trim() } }));
+    child.on('exit', (code) => {
+      this.log.warn({ event: 'drive_reset_finished', device: this.config.DRIVE_DEVICE, resetDevice: target, exitCode: code });
+      this.client.send({ ripLog: { jobId: this.activeJobId ?? 'drive-reset', stream: 'system', line: `Drive reset finished with exit code ${code}` } });
+      setTimeout(() => void this.refresh('drive-reset'), 2500).unref();
     });
   }
 

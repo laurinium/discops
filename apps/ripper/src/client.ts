@@ -10,6 +10,7 @@ type BackendCommand = {
   cancelRip?: { reason?: string };
   ejectDisc?: object;
   refreshDisc?: object;
+  resetDrive?: object;
 };
 type RipperEvent = Record<string, unknown>;
 type CommandHandler = (command: BackendCommand) => void;

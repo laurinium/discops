@@ -45,6 +45,10 @@ function statusText(drive: DriveSnapshot): string {
 
 function DriveCard({ drive }: { drive: DriveSnapshot }) {
   const pct = Math.round(drive.progressPercent ?? 0);
+  const resetDrive = () => {
+    const warning = `Reset optical drive ${drive.ripperId} (${drive.device})?\n\nThis will cancel any active rip and issue a SCSI device reset. Use only when the drive/controller appears stuck or is returning repeated read errors.`;
+    if (window.confirm(warning)) void command(drive.ripperId, 'resetDrive');
+  };
   const art = useAlbumArt(drive.artist, drive.album);
   const tracks = drive.tracks ?? [];
   return <section className={`card state-${drive.state}`}>
@@ -77,6 +81,7 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
       <button onClick={() => void command(drive.ripperId, 'cancelRip')} disabled={drive.state !== 'ripping'}>Cancel</button>
       <button onClick={() => void command(drive.ripperId, 'ejectDisc')}>{drive.trayStatus === 'open' ? 'Close tray' : 'Eject'}</button>
       <button onClick={() => void command(drive.ripperId, 'refreshDisc')}>Refresh</button>
+      <button className="danger" onClick={resetDrive}>Reset drive</button>
     </div>
 
     {tracks.length > 0 && <section className="tracks"><h3>Tracks</h3><ol>{tracks.map((track) => <li key={track.number} className={track.number === drive.currentTrack ? 'activeTrack' : ''}><span>{String(track.number).padStart(2, '0')}</span>{track.title}</li>)}</ol></section>}

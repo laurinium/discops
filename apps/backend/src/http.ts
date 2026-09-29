@@ -28,7 +28,7 @@ export function createHttp(state: AppState, corsOrigin: string): express.Express
   app.post('/api/rippers/:ripperId/:command', (req, res, next) => {
     try {
       const { ripperId, command } = req.params;
-      if (!['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc'].includes(command ?? '')) {
+      if (!['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc', 'resetDrive'].includes(command ?? '')) {
         res.status(404).json({ error: 'unknown command' });
         return;
       }

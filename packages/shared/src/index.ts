@@ -23,7 +23,7 @@ export type JobState = (typeof jobStates)[number];
 
 export const RipperCommandSchema = z.object({
   ripperId: z.string().min(1),
-  command: z.enum(['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc']),
+  command: z.enum(['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc', 'resetDrive']),
 });
 export type RipperCommandRequest = z.infer<typeof RipperCommandSchema>;
 

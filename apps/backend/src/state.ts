@@ -13,6 +13,7 @@ export class AppState extends EventEmitter {
   constructor(private store: Store) { super(); }
 
   listDrives(): DriveSnapshot[] { return [...this.drives.values()].sort((a, b) => a.ripperId.localeCompare(b.ripperId)); }
+  getDrive(ripperId: string): DriveSnapshot | undefined { return this.drives.get(ripperId); }
   history(): HistoryJob[] { return this.store.listJobs(); }
   attach(ripperId: string, stream: Stream): void { this.streams.set(ripperId, stream); this.patch(ripperId, { connected: true }); }
   detach(ripperId: string): void { this.streams.delete(ripperId); this.patch(ripperId, { connected: false }); }

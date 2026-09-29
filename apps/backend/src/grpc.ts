@@ -26,6 +26,29 @@ function tracks(v: unknown): TrackMetadata[] | undefined {
 function defined<T extends object>(value: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
+function metadataFromLog(line: string, previous?: DriveSnapshot): Partial<DriveSnapshot> | undefined {
+  const clean = line.replace(/^\[(stdout|stderr)]\s*/, '');
+  const selected = clean.match(/Selected:\s+#\d+\s+\((.+?)\s+\/\s+(.+?)\)\s*$/i);
+  const candidate = clean.match(/^#\d+\s+\([^)]+\):\s+----\s+(.+?)\s+\/\s+(.+?)\s+----\s*$/);
+  const patch: Partial<DriveSnapshot> = {};
+  const metadata = selected ?? candidate;
+  if (metadata?.[1] && metadata?.[2]) {
+    patch.artist = metadata[1].trim();
+    patch.album = metadata[2].trim();
+    patch.state = previous?.state === 'ripping' ? 'ripping' : 'reading-metadata';
+  }
+  const track = clean.match(/^\s*(\d{1,3}):\s+(.+?)\s*$/);
+  if (track?.[1] && track?.[2]) {
+    const number = Number(track[1]);
+    const title = track[2].trim();
+    if (!Number.isNaN(number) && title) {
+      const existing = previous?.tracks ?? [];
+      patch.tracks = [...existing.filter((t) => t.number !== number), { number, title }].sort((a, b) => a.number - b.number);
+      patch.totalTracks = patch.tracks.length;
+    }
+  }
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
 
 export function startGrpc(state: AppState, port: number): grpc.Server {
   const server = new grpc.Server();
@@ -56,7 +79,10 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
         }
         if ('ripLog' in msg && msg.ripLog && typeof msg.ripLog === 'object') {
           const l = msg.ripLog as Event;
-          state.appendLog(ripperId, `[${str(l.stream) ?? 'out'}] ${str(l.line) ?? ''}`);
+          const rawLine = str(l.line) ?? '';
+          state.appendLog(ripperId, `[${str(l.stream) ?? 'out'}] ${rawLine}`);
+          const metadataPatch = metadataFromLog(rawLine, state.getDrive(ripperId));
+          if (metadataPatch) state.patch(ripperId, metadataPatch);
         }
         if ('ripEvent' in msg && msg.ripEvent && typeof msg.ripEvent === 'object') {
           const r = msg.ripEvent as Event;

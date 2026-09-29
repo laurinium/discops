@@ -63,7 +63,11 @@ export class RipperController {
       this.setState('ripping', p);
       this.client.send({ ripEvent: { type: 'RIP_PROGRESS', ...p } });
     });
-    this.abcde.on('completed', ({ jobId }: { jobId: string }) => { this.setState('completed', { progressPercent: 100 }); this.client.send({ ripEvent: { type: 'RIP_COMPLETED', jobId } }); });
+    this.abcde.on('completed', ({ jobId }: { jobId: string }) => {
+      this.setState('completed', { progressPercent: 100 });
+      this.client.send({ ripEvent: { type: 'RIP_COMPLETED', jobId } });
+      this.openTrayAfterCompletion();
+    });
     this.abcde.on('failed', ({ jobId, error }: { jobId: string; error: string }) => { this.setState('failed', { error }); this.client.send({ ripEvent: { type: 'RIP_FAILED', jobId, error } }); });
     this.abcde.on('cancelled', ({ jobId }: { jobId: string }) => { this.setState('cancelled'); this.client.send({ ripEvent: { type: 'RIP_CANCELLED', jobId } }); });
   }
@@ -126,6 +130,18 @@ export class RipperController {
       outputDir: this.config.OUTPUT_DIR,
       ...(this.config.ABCDE_CONFIG ? { configPath: this.config.ABCDE_CONFIG } : {}),
       outputFormat: this.config.OUTPUT_FORMAT,
+    });
+  }
+
+  private openTrayAfterCompletion(): void {
+    const child = spawn('eject', [this.config.DRIVE_DEVICE], { stdio: 'ignore' });
+    child.on('exit', (code) => {
+      if (code === 0) {
+        this.mediaPresent = false;
+        this.trayStatus = 'open';
+        this.setState('completed', { progressPercent: 100 });
+      }
+      setTimeout(() => void this.refresh('completed-eject'), 1500).unref();
     });
   }
 

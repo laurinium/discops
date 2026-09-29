@@ -76,15 +76,18 @@ Linux host with:
 
 ## Docker permissions and udev
 
-The default compose grants each ripper only:
+The default compose grants each ripper its optical block device and matching SCSI generic device:
 
 ```yaml
 devices:
   - /dev/sr0:/dev/sr0
+  - /dev/sg0:/dev/sg0
 volumes:
   - /run/udev:/run/udev:ro
   - ./data/music:/music
 ```
+
+The `/dev/sgX` mapping is important for reliable `cdparanoia`/`abcde` reads on many drives.
 
 The container does **not** run `udevd`. It runs `udevadm monitor` against host udev data and has a small polling fallback for resilience. `privileged: true` is intentionally not enabled by default.
 
@@ -225,7 +228,8 @@ If insertion is not detected:
 1. verify `/run/udev` is mounted read-only into the ripper
 2. verify the correct `/dev/srX` is mapped
 3. check whether your drive also needs `/dev/sgX`
-4. set `UDEV_MONITOR=false` temporarily to rely on polling fallback
+4. verify the matching `/dev/sgX` is mapped (`lsscsi -g` is useful)
+5. set `UDEV_MONITOR=false` temporarily to rely on polling fallback
 
 If `abcde` fails metadata lookup, ripping may still work depending on your abcde config. Customize `/etc/abcde.conf` for your preferred metadata/musicbrainz setup.
 

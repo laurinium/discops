@@ -25,7 +25,8 @@ export function createHttp(state: AppState, corsOrigin: string): express.Express
   </body>
 </html>`);
   });
-  app.get('/api/state', (_req, res) => res.json({ drives: state.listDrives(), history: state.history() }));
+  app.get('/api/state', (_req, res) => res.json({ drives: state.listDrives(), history: state.history(), albums: state.albums() }));
+  app.get('/api/albums', (_req, res) => res.json({ albums: state.albums() }));
   app.get('/api/status', async (_req, res, next) => {
     try { res.json(await buildStatus(state)); } catch (err) { next(err); }
   });
@@ -42,7 +43,7 @@ export function createHttp(state: AppState, corsOrigin: string): express.Express
   });
   app.get('/api/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream'); res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Connection', 'keep-alive');
-    const send = () => res.write(`data: ${JSON.stringify({ drives: state.listDrives(), history: state.history() })}\n\n`);
+    const send = () => res.write(`data: ${JSON.stringify({ drives: state.listDrives(), history: state.history(), albums: state.albums() })}\n\n`);
     send(); state.on('change', send); req.on('close', () => state.off('change', send));
   });
   return app;

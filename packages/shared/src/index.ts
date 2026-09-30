@@ -74,6 +74,21 @@ export interface DriveSnapshot {
   error?: string;
 }
 
+export interface RippedAlbum {
+  jobId: string;
+  ripperId: string;
+  device: string;
+  artist?: string;
+  album?: string;
+  releaseDate?: string;
+  musicBrainzDiscId?: string;
+  musicBrainzReleaseId?: string;
+  discNumber?: number;
+  totalDiscs?: number;
+  tracks: TrackMetadata[];
+  completedAt: string;
+}
+
 export interface HistoryJob {
   id: string;
   ripperId: string;

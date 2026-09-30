@@ -48,6 +48,14 @@ export const openApiDocument = {
         },
       },
     },
+    '/api/albums': {
+      get: {
+        tags: ['State'],
+        summary: 'Get successfully ripped albums',
+        operationId: 'getAlbums',
+        responses: { '200': { description: 'Successful rips with captured track lists', content: { 'application/json': { schema: { type: 'object', required: ['albums'], properties: { albums: { type: 'array', items: { $ref: '#/components/schemas/RippedAlbum' } } } } } } } },
+      },
+    },
     '/api/events': {
       get: {
         tags: ['State'],
@@ -144,10 +152,11 @@ export const openApiDocument = {
       },
       ApiState: {
         type: 'object',
-        required: ['drives', 'history'],
+        required: ['drives', 'history', 'albums'],
         properties: {
           drives: { type: 'array', items: { $ref: '#/components/schemas/DriveSnapshot' } },
           history: { type: 'array', items: { $ref: '#/components/schemas/HistoryJob' } },
+          albums: { type: 'array', items: { $ref: '#/components/schemas/RippedAlbum' } },
         },
       },
       DriveSnapshot: {
@@ -193,6 +202,24 @@ export const openApiDocument = {
         properties: {
           number: { type: 'integer', minimum: 1 },
           title: { type: 'string' },
+        },
+      },
+      RippedAlbum: {
+        type: 'object',
+        required: ['jobId', 'ripperId', 'device', 'tracks', 'completedAt'],
+        properties: {
+          jobId: { type: 'string', format: 'uuid' },
+          ripperId: { type: 'string' },
+          device: { type: 'string' },
+          artist: { type: 'string' },
+          album: { type: 'string' },
+          releaseDate: { type: 'string' },
+          musicBrainzDiscId: { type: 'string' },
+          musicBrainzReleaseId: { type: 'string' },
+          discNumber: { type: 'integer', minimum: 1 },
+          totalDiscs: { type: 'integer', minimum: 1 },
+          tracks: { type: 'array', items: { $ref: '#/components/schemas/TrackMetadata' } },
+          completedAt: { type: 'string', format: 'date-time' },
         },
       },
       HistoryJob: {

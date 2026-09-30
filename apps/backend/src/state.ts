@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { ServerWritableStream } from '@grpc/grpc-js';
-import type { DriveSnapshot, HistoryJob, JobState, RipperCommandRequest } from '@rippy/shared';
+import type { DriveSnapshot, HistoryJob, JobState, RippedAlbum, RipperCommandRequest } from '@rippy/shared';
 import { RipperCommandSchema } from '@rippy/shared';
 import type { Store } from './store.js';
 
@@ -22,6 +22,7 @@ export class AppState extends EventEmitter {
     this.drives.set(ripperId, drive);
   }
   history(): HistoryJob[] { return this.store.listJobs(); }
+  albums(): RippedAlbum[] { return this.store.listRippedAlbums(); }
   attach(ripperId: string, stream: Stream): void { this.streams.set(ripperId, stream); this.patch(ripperId, { connected: true }); }
   detach(ripperId: string): void { this.streams.delete(ripperId); this.patch(ripperId, { connected: false }); }
 
@@ -41,6 +42,25 @@ export class AppState extends EventEmitter {
 
   recordJob(job: HistoryJob): void { this.store.upsertJob(job); this.emit('change'); }
   finishJob(id: string, state: JobState, error?: string): void { this.store.finishJob(id, state, error); this.emit('change'); }
+  completeRippedAlbum(jobId: string, ripperId: string): void {
+    const drive = this.drives.get(ripperId);
+    if (!drive) return;
+    this.store.upsertRippedAlbum({
+      jobId,
+      ripperId,
+      device: drive.device,
+      ...(drive.artist ? { artist: drive.artist } : {}),
+      ...(drive.album ? { album: drive.album } : {}),
+      ...(drive.releaseDate ? { releaseDate: drive.releaseDate } : {}),
+      ...(drive.musicBrainzDiscId ? { musicBrainzDiscId: drive.musicBrainzDiscId } : {}),
+      ...(drive.musicBrainzReleaseId ? { musicBrainzReleaseId: drive.musicBrainzReleaseId } : {}),
+      ...(drive.discNumber ? { discNumber: drive.discNumber } : {}),
+      ...(drive.totalDiscs ? { totalDiscs: drive.totalDiscs } : {}),
+      tracks: drive.tracks ?? [],
+      completedAt: new Date().toISOString(),
+    });
+    this.emit('change');
+  }
 
   sendCommand(input: RipperCommandRequest): void {
     const req = RipperCommandSchema.parse(input);

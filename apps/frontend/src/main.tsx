@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Activity, AlertTriangle, Disc3, Download, Eject, Pause, Play, RefreshCw, RotateCcw, Search, Server, Wifi } from 'lucide-react';
-import type { DriveSnapshot, HistoryJob } from '@rippy/shared';
+import type { DriveSnapshot, HistoryJob, RippedAlbum } from '@rippy/shared';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './components/ui/alert-dialog.js';
 import { Badge } from './components/ui/badge.js';
 import { Button } from './components/ui/button.js';
@@ -12,9 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs.js';
 import './style.css';
 
-interface ApiState { drives: DriveSnapshot[]; history: HistoryJob[] }
+interface ApiState { drives: DriveSnapshot[]; history: HistoryJob[]; albums: RippedAlbum[] }
 interface StatusData { time: string; host: Record<string, unknown>; musicBrainz: Record<string, unknown>; drives: Array<Record<string, unknown>> }
-const empty: ApiState = { drives: [], history: [] };
+const empty: ApiState = { drives: [], history: [], albums: [] };
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 function command(ripperId: string, cmd: string): Promise<void> {
@@ -119,6 +119,27 @@ function StatusPage() {
 
 function JsonCard({ title, data, icon }: { title: string; data: Record<string, unknown>; icon: React.ReactNode }) { return <Card><CardHeader><CardTitle className="flex items-center gap-2">{icon}{title}</CardTitle></CardHeader><CardContent><dl className="grid grid-cols-[9rem_1fr] gap-2 text-sm">{Object.entries(data).map(([k, v]) => <React.Fragment key={k}><dt className="text-muted-foreground">{k}</dt><dd className="truncate" title={String(v)}>{Array.isArray(v) ? v.join(', ') : String(v)}</dd></React.Fragment>)}</dl></CardContent></Card>; }
 
+function AlbumsPage({ albums }: { albums: RippedAlbum[] }) {
+  if (albums.length === 0) return <Card><CardHeader><CardTitle>Ripped albums</CardTitle><CardDescription>No successful rips recorded yet.</CardDescription></CardHeader></Card>;
+  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {albums.map((album) => <Card key={album.jobId}>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><CardTitle className="line-clamp-2 text-lg">{album.album ?? 'Unknown album'}</CardTitle><CardDescription>{album.artist ?? 'Unknown artist'}</CardDescription></div>
+          <Badge variant="success">ripped</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs"><Info label="Drive" value={`${album.ripperId} · ${album.device}`} /><Info label="Completed" value={album.completedAt} />{album.discNumber && <Info label="Disc" value={`${album.discNumber}${album.totalDiscs ? ` / ${album.totalDiscs}` : ''}`} />}{album.releaseDate && <Info label="Released" value={album.releaseDate} />}{album.musicBrainzReleaseId && <Info label="MB release" value={album.musicBrainzReleaseId.slice(0, 8)} title={album.musicBrainzReleaseId} />}</div>
+        <div className="max-h-72 overflow-auto rounded-md border bg-muted/20 p-2">
+          <div className="mb-2 text-xs font-semibold text-muted-foreground">{album.tracks.length} tracks</div>
+          {album.tracks.length ? album.tracks.map((track) => <div key={`${album.jobId}-${track.number}`} className="grid grid-cols-[2.5rem_1fr] rounded px-2 py-1 text-sm"><span className="text-muted-foreground">{String(track.number).padStart(2, '0')}</span><span className="truncate">{track.title}</span></div>) : <div className="text-sm text-muted-foreground">Track list was not captured for this rip.</div>}
+        </div>
+      </CardContent>
+    </Card>)}
+  </div>;
+}
+
 function History({ history }: { history: HistoryJob[] }) { return <Card><CardHeader><CardTitle>History</CardTitle><CardDescription>Recent rip jobs</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Started</TableHead><TableHead>Drive</TableHead><TableHead>Album</TableHead><TableHead>Status</TableHead><TableHead>Error</TableHead></TableRow></TableHeader><TableBody>{history.map((j) => <TableRow key={j.id}><TableCell>{j.startedAt}</TableCell><TableCell>{j.ripperId}</TableCell><TableCell>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</TableCell><TableCell><Badge variant={j.state === 'completed' ? 'success' : j.state.includes('failed') ? 'destructive' : 'secondary'}>{j.state}</Badge></TableCell><TableCell className="text-red-300">{j.error}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>; }
 
 function App() {
@@ -126,7 +147,7 @@ function App() {
   const [error, setError] = useState<string>();
   useEffect(() => { fetch(`${apiBase}/api/state`).then((r) => r.json()).then(setState).catch((e: Error) => setError(e.message)); const es = new EventSource(`${apiBase}/api/events`); es.onmessage = (ev) => { setState(JSON.parse(ev.data) as ApiState); setError(undefined); }; es.onerror = () => setError('live connection interrupted'); return () => es.close(); }, []);
   const drives = useMemo(() => state.drives, [state.drives]);
-  return <main className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6"><header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><h1 className="text-3xl font-bold tracking-tight md:text-4xl">DiscOps</h1><p className="text-muted-foreground">Multi-drive abcde ripping dashboard</p></div></header>{error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-red-200">{error}</div>}<Tabs defaultValue="dashboard" className="space-y-4"><TabsList><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="logs">Logs</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList><TabsContent value="dashboard" className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <Card><CardContent className="p-6 text-muted-foreground">No rippers connected yet.</CardContent></Card>}</div><History history={state.history} /></TabsContent><TabsContent value="logs"><LogViewer drives={drives} /></TabsContent><TabsContent value="status"><StatusPage /></TabsContent></Tabs></main>;
+  return <main className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6"><header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><h1 className="text-3xl font-bold tracking-tight md:text-4xl">DiscOps</h1><p className="text-muted-foreground">Multi-drive abcde ripping dashboard</p></div></header>{error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-red-200">{error}</div>}<Tabs defaultValue="dashboard" className="space-y-4"><TabsList><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="albums">Albums</TabsTrigger><TabsTrigger value="logs">Logs</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList><TabsContent value="dashboard" className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <Card><CardContent className="p-6 text-muted-foreground">No rippers connected yet.</CardContent></Card>}</div><History history={state.history} /></TabsContent><TabsContent value="albums"><AlbumsPage albums={state.albums ?? []} /></TabsContent><TabsContent value="logs"><LogViewer drives={drives} /></TabsContent><TabsContent value="status"><StatusPage /></TabsContent></Tabs></main>;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

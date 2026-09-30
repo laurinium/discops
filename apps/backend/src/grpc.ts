@@ -113,7 +113,7 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
             artist: str(r.artist), album: str(r.album), releaseDate: str(r.releaseDate), musicBrainzDiscId: str(r.musicBrainzDiscId), musicBrainzReleaseId: str(r.musicBrainzReleaseId),
             discNumber: num(r.discNumber), totalDiscs: num(r.totalDiscs),
           }));
-          if (type === 'RIP_COMPLETED') { state.patch(ripperId, { state: 'completed', progressPercent: 100 }); state.finishJob(jobId, 'completed'); }
+          if (type === 'RIP_COMPLETED') { state.patch(ripperId, { state: 'completed', progressPercent: 100 }); state.finishJob(jobId, 'completed'); state.completeRippedAlbum(jobId, ripperId); }
           if (type === 'RIP_FAILED') { state.patch(ripperId, defined<Partial<DriveSnapshot>>({ state: 'failed', error: str(r.error) })); state.finishJob(jobId, 'failed', str(r.error)); }
           if (type === 'RIP_CANCELLED') { state.patch(ripperId, { state: 'cancelled' }); state.finishJob(jobId, 'cancelled'); }
         }

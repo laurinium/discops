@@ -3,6 +3,7 @@ import { createWriteStream, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import type { Writable } from 'node:stream';
 import {
+  applyMusicBrainzDiscMetadata,
   atomicPublish,
   createJobPaths,
   prepareFreshJob,
@@ -73,6 +74,7 @@ export class AbcdeRunner extends EventEmitter {
           totalDiscs: musicBrainz.totalDiscs,
         });
 
+        this.emit('log', { jobId, stream: 'stdout', line: `Starting abcde ${args.map((arg) => JSON.stringify(arg)).join(' ')}` });
         const env = { ...process.env, TERM: process.env.TERM ?? 'dumb' };
         const child = spawn('abcde', args, { env, cwd: paths.workDir, shell: false, detached: true });
         this.child = child;
@@ -114,6 +116,12 @@ export class AbcdeRunner extends EventEmitter {
           if (this.cancelled) {
             this.markTerminal(paths, 'CANCELLED');
             this.emit('cancelled', { jobId });
+            return;
+          }
+          try {
+            if (code === 0) applyMusicBrainzDiscMetadata(paths);
+          } catch (err) {
+            this.fail(jobId, paths, 'FAILED_METADATA', err instanceof Error ? err.message : String(err), code, signal);
             return;
           }
           const validation = validateCompletedRip(paths, expectedTracks, code);

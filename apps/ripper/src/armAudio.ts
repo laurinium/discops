@@ -7,6 +7,8 @@ export type ArmFailureType = 'FAILED_READ' | 'FAILED_ENCODE' | 'FAILED_VERIFY' |
 export interface TrackExpectation { discId?: string; expectedTracks: number; }
 export interface JobPaths { workDir: string; stagingDir: string; publishDir: string; logDir: string; wavDir: string; abcdeConfig: string; stdoutLog: string; stderrLog: string; }
 export interface ValidationResult { ok: boolean; failureType?: ArmFailureType; error?: string; flacFiles: string[]; expectedTracks: number; completedTracks: number; }
+interface PersistedMusicBrainzMetadata { discNumber?: number; totalDiscs?: number; musicBrainzDiscId?: string; releaseId?: string; releaseDate?: string; }
+interface PersistedJobMetadata { musicBrainz?: PersistedMusicBrainzMetadata; }
 
 export function createJobPaths(workRoot: string, jobId: string): JobPaths {
   const safeJobId = jobId.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -92,6 +94,21 @@ export function verifyFlac(file: string): boolean {
   return result.status === 0;
 }
 
+export function applyMusicBrainzDiscMetadata(paths: JobPaths): void {
+  const metadata = readPersistedJobMetadata(paths);
+  const mb = metadata.musicBrainz;
+  if (!mb?.discNumber) return;
+  const args = [`--set-tag=DISCNUMBER=${mb.discNumber}`];
+  if (mb.totalDiscs) args.push(`--set-tag=DISCTOTAL=${mb.totalDiscs}`);
+  if (mb.musicBrainzDiscId) args.push(`--set-tag=MUSICBRAINZ_DISCID=${mb.musicBrainzDiscId}`);
+  if (mb.releaseId) args.push(`--set-tag=MUSICBRAINZ_ALBUMID=${mb.releaseId}`);
+  if (mb.releaseDate) args.push(`--set-tag=DATE=${mb.releaseDate}`);
+  for (const file of listFiles(paths.stagingDir, '.flac')) {
+    const result = spawnSync('metaflac', [...args, file], { encoding: 'utf8', timeout: 120_000 });
+    if (result.status !== 0) throw new Error(`metaflac failed for ${path.basename(file)}: ${result.stderr || result.stdout || result.error?.message || 'unknown error'}`);
+  }
+}
+
 export function validateCompletedRip(paths: JobPaths, expectedTracks: number, abcdeExitCode: number | null): ValidationResult {
   const flacFiles = listFiles(paths.stagingDir, '.flac');
   if (abcdeExitCode !== 0) return { ok: false, failureType: classifyAbcdeFailure(paths), error: `abcde exited with code ${abcdeExitCode}`, flacFiles, expectedTracks, completedTracks: flacFiles.length };
@@ -164,6 +181,13 @@ export function sanitizePathSegment(input: string): string {
     .replace(/^\.+$/, '')
     .slice(0, 160);
   return cleaned.length > 0 ? cleaned : 'Unknown';
+}
+
+function readPersistedJobMetadata(paths: JobPaths): PersistedJobMetadata {
+  try {
+    const parsed = JSON.parse(readFileSync(path.join(paths.workDir, 'job.json'), 'utf8')) as PersistedJobMetadata;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch { return {}; }
 }
 
 export function preparePublishTree(paths: JobPaths): void {

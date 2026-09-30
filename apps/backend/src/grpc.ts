@@ -70,6 +70,7 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
               vendor: str(hello.driveVendor),
               model: str(hello.driveModel),
               revision: str(hello.driveRevision),
+              serial: str(hello.driveSerial),
               canOpenTray: typeof hello.canOpenTray === 'boolean' ? hello.canOpenTray : undefined,
               canCloseTray: typeof hello.canCloseTray === 'boolean' ? hello.canCloseTray : undefined,
               canLockTray: typeof hello.canLockTray === 'boolean' ? hello.canLockTray : undefined,

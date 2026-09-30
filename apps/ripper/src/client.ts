@@ -82,6 +82,7 @@ export class BackendClient {
       driveVendor: this.driveInfo.vendor,
       driveModel: this.driveInfo.model,
       driveRevision: this.driveInfo.revision,
+      driveSerial: this.driveInfo.serial,
       canOpenTray: this.driveInfo.canOpenTray,
       canCloseTray: this.driveInfo.canCloseTray,
       canLockTray: this.driveInfo.canLockTray,

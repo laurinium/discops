@@ -39,6 +39,7 @@ export interface DriveInfo {
   model?: string;
   vendor?: string;
   revision?: string;
+  serial?: string;
   canOpenTray?: boolean;
   canCloseTray?: boolean;
   canLockTray?: boolean;

@@ -16,10 +16,12 @@ export interface RipperHello {
   'canLockTray'?: (boolean);
   'canReadDvd'?: (boolean);
   'canWriteCdr'?: (boolean);
+  'driveSerial'?: (string);
   '_sgDevice'?: "sgDevice";
   '_driveVendor'?: "driveVendor";
   '_driveModel'?: "driveModel";
   '_driveRevision'?: "driveRevision";
+  '_driveSerial'?: "driveSerial";
   '_canOpenTray'?: "canOpenTray";
   '_canCloseTray'?: "canCloseTray";
   '_canLockTray'?: "canLockTray";
@@ -42,10 +44,12 @@ export interface RipperHello__Output {
   'canLockTray'?: (boolean);
   'canReadDvd'?: (boolean);
   'canWriteCdr'?: (boolean);
+  'driveSerial'?: (string);
   '_sgDevice'?: "sgDevice";
   '_driveVendor'?: "driveVendor";
   '_driveModel'?: "driveModel";
   '_driveRevision'?: "driveRevision";
+  '_driveSerial'?: "driveSerial";
   '_canOpenTray'?: "canOpenTray";
   '_canCloseTray'?: "canCloseTray";
   '_canLockTray'?: "canLockTray";

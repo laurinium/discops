@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, readlinkSync, statSync } from 'node:fs';
 
 export type MediaStatus = 'present' | 'absent' | 'unknown' | 'unsupported';
 export type TrayStatus = 'open' | 'closed' | 'unknown';
@@ -13,6 +13,7 @@ export interface LocalDriveInfo {
   vendor?: string;
   model?: string;
   revision?: string;
+  serial?: string;
   canOpenTray?: boolean;
   canCloseTray?: boolean;
   canLockTray?: boolean;
@@ -49,6 +50,8 @@ export function readLocalDriveInfo(device: string): LocalDriveInfo {
     if (model) info.model = model;
     if (revision) info.revision = revision;
   } catch { /* best effort */ }
+  const serial = readDriveSerial(name);
+  if (serial) info.serial = serial;
   try {
     const cdromInfo = readFileSync('/proc/sys/dev/cdrom/info', 'utf8');
     const lines = Object.fromEntries(cdromInfo.split('\n').map((line) => {
@@ -70,6 +73,29 @@ export function readLocalDriveInfo(device: string): LocalDriveInfo {
     if (canWriteCdr !== undefined) info.canWriteCdr = canWriteCdr;
   } catch { /* best effort */ }
   return info;
+}
+
+function readDriveSerial(blockName: string): string | undefined {
+  const clean = (value: string): string | undefined => {
+    const text = value.replace(/[^\x20-\x7E]+/g, ' ').trim();
+    return text.length > 0 ? text : undefined;
+  };
+  for (const file of [`/sys/block/${blockName}/device/serial`, `/sys/block/${blockName}/device/vpd_pg80`]) {
+    try {
+      const value = clean(readFileSync(file).toString('utf8'));
+      if (value) return value;
+    } catch { /* try next */ }
+  }
+  try {
+    for (const entry of readdirSync('/dev/disk/by-id')) {
+      const link = readlinkSync(`/dev/disk/by-id/${entry}`);
+      if (!link.endsWith(`/${blockName}`)) continue;
+      const match = entry.match(/^(?:ata|scsi|usb)-(.+)$/);
+      const value = clean(match?.[1] ?? entry);
+      if (value) return value;
+    }
+  } catch { /* best effort */ }
+  return undefined;
 }
 
 export async function probeDrive(device: string): Promise<DriveProbe> {

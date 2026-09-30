@@ -41,6 +41,7 @@ message RipperHello {
   optional string drive_vendor = 7;
   optional string drive_model = 8;
   optional string drive_revision = 9;
+  optional string drive_serial = 15;
   optional bool can_open_tray = 10;
   optional bool can_close_tray = 11;
   optional bool can_lock_tray = 12;

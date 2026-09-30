@@ -29,6 +29,8 @@ export async function buildStatus(state: AppState): Promise<object> {
       lastSeenAt: drive.lastSeenAt,
       driveInfo: drive.driveInfo,
       currentJob: {
+        jobId: drive.currentJobId,
+        running: ['reading-metadata', 'ripping', 'encoding'].includes(drive.state),
         artist: drive.artist,
         album: drive.album,
         discNumber: drive.discNumber,

@@ -55,6 +55,7 @@ export interface DriveSnapshot {
   mediaPresent: boolean;
   trayStatus?: TrayStatus;
   discId?: string;
+  currentJobId?: string;
   artist?: string;
   album?: string;
   releaseDate?: string;

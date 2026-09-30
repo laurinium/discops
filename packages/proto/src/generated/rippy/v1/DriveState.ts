@@ -21,7 +21,9 @@ export interface DriveState {
   'musicBrainzReleaseId'?: (string);
   'discNumber'?: (number);
   'totalDiscs'?: (number);
+  'jobId'?: (string);
   '_trayStatus'?: "trayStatus";
+  '_jobId'?: "jobId";
   '_discId'?: "discId";
   '_artist'?: "artist";
   '_album'?: "album";
@@ -56,7 +58,9 @@ export interface DriveState__Output {
   'musicBrainzReleaseId'?: (string);
   'discNumber'?: (number);
   'totalDiscs'?: (number);
+  'jobId'?: (string);
   '_trayStatus'?: "trayStatus";
+  '_jobId'?: "jobId";
   '_discId'?: "discId";
   '_artist'?: "artist";
   '_album'?: "album";

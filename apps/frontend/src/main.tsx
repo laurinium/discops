@@ -73,6 +73,7 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
       <dt>Tray</dt><dd>{drive.trayStatus ?? 'unknown'}</dd>
       {drive.discNumber && <><dt>Disc</dt><dd>{drive.discNumber}{drive.totalDiscs ? ` / ${drive.totalDiscs}` : ''}</dd></>}
       {drive.releaseDate && <><dt>Released</dt><dd>{drive.releaseDate}</dd></>}
+      {drive.currentJobId && <><dt>Job</dt><dd title={drive.currentJobId}>{drive.currentJobId.slice(0, 8)}</dd></>}
       {drive.currentTrack && <><dt>Track</dt><dd>{drive.currentTrack} / {drive.totalTracks ?? (tracks.length || '?')}</dd></>}
       {drive.currentFile && <><dt>Current</dt><dd>{drive.currentFile}</dd></>}
       {drive.error && <><dt>Error</dt><dd className="badText">{drive.error}</dd></>}

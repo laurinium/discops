@@ -209,6 +209,7 @@ export class RipperController {
     this.state = state;
     this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, {
       trayStatus: this.trayStatus,
+      jobId: this.activeJobId,
       artist: this.artist,
       album: this.album,
       tracks: this.tracks,

@@ -61,6 +61,7 @@ message DriveState {
   string state = 3;
   optional string tray_status = 12;
   repeated TrackMetadata tracks = 13;
+  optional string job_id = 19;
   optional string disc_id = 4;
   optional string artist = 5;
   optional string album = 6;

@@ -66,7 +66,14 @@ export class RipperController {
       this.artist = undefined;
       this.album = undefined;
       this.tracks = [];
-      this.setState('reading-metadata', { totalTracks: expectedTracks, discId });
+      this.setState('reading-metadata', {
+        totalTracks: expectedTracks,
+        discId,
+        currentTrack: 0,
+        progressPercent: 0,
+        currentFile: '',
+        error: '',
+      });
       this.log.info({ event: 'rip_started', jobId, expectedTracks, discId, workDir, device: this.config.DRIVE_DEVICE });
       this.client.send({ ripEvent: { type: 'RIP_STARTED', jobId } });
     });

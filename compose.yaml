@@ -78,6 +78,7 @@ services:
       BACKEND_GRPC_PORT: "50051"
       DATABASE_PATH: /data/rippy.db
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      EXPECTED_RIPPERS: ${EXPECTED_RIPPERS:-drive-01:/dev/sr0:/dev/sg0,drive-02:/dev/sr1:/dev/sg1}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - type: bind

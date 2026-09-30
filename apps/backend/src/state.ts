@@ -14,6 +14,13 @@ export class AppState extends EventEmitter {
 
   listDrives(): DriveSnapshot[] { return [...this.drives.values()].sort((a, b) => a.ripperId.localeCompare(b.ripperId)); }
   getDrive(ripperId: string): DriveSnapshot | undefined { return this.drives.get(ripperId); }
+  ensureDrive(ripperId: string, device: string, sgDevice?: string): void {
+    if (this.drives.has(ripperId)) return;
+    const now = new Date().toISOString();
+    const drive: DriveSnapshot = { ripperId, device, connected: false, state: 'idle', mediaPresent: false, lastSeenAt: now, logs: [] };
+    if (sgDevice) drive.driveInfo = { sgDevice };
+    this.drives.set(ripperId, drive);
+  }
   history(): HistoryJob[] { return this.store.listJobs(); }
   attach(ripperId: string, stream: Stream): void { this.streams.set(ripperId, stream); this.patch(ripperId, { connected: true }); }
   detach(ripperId: string): void { this.streams.delete(ripperId); this.patch(ripperId, { connected: false }); }

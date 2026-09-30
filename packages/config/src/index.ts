@@ -10,6 +10,7 @@ export const BackendEnv = z.object({
   BACKEND_GRPC_PORT: z.coerce.number().default(50051),
   DATABASE_PATH: z.string().default('/data/rippy.db'),
   CORS_ORIGIN: z.string().default('*'),
+  EXPECTED_RIPPERS: z.string().default('drive-01:/dev/sr0:/dev/sg0,drive-02:/dev/sr1:/dev/sg1'),
 });
 
 export const RipperEnv = z.object({

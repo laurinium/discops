@@ -61,7 +61,22 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
         if ('hello' in msg && msg.hello && typeof msg.hello === 'object') {
           const hello = msg.hello as Event;
           state.attach(ripperId, stream as never);
-          state.patch(ripperId, { device: str(hello.device) ?? 'unknown', connected: true, state: 'idle' });
+          state.patch(ripperId, defined<Partial<DriveSnapshot>>({
+            device: str(hello.device) ?? 'unknown',
+            connected: true,
+            state: 'idle',
+            driveInfo: {
+              sgDevice: str(hello.sgDevice),
+              vendor: str(hello.driveVendor),
+              model: str(hello.driveModel),
+              revision: str(hello.driveRevision),
+              canOpenTray: typeof hello.canOpenTray === 'boolean' ? hello.canOpenTray : undefined,
+              canCloseTray: typeof hello.canCloseTray === 'boolean' ? hello.canCloseTray : undefined,
+              canLockTray: typeof hello.canLockTray === 'boolean' ? hello.canLockTray : undefined,
+              canReadDvd: typeof hello.canReadDvd === 'boolean' ? hello.canReadDvd : undefined,
+              canWriteCdr: typeof hello.canWriteCdr === 'boolean' ? hello.canWriteCdr : undefined,
+            },
+          }));
           logger.info({ ripperId, device: hello.device, event: 'ripper_connected' });
         }
         if ('heartbeat' in msg) state.patch(ripperId, { connected: true });

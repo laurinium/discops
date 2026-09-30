@@ -2,7 +2,7 @@ import os from 'node:os';
 import { credentials, type ClientDuplexStream } from '@grpc/grpc-js';
 import { loadProto } from '@rippy/proto';
 import type { RipperConfig } from '@rippy/config';
-import type { JobState } from '@rippy/shared';
+import type { DriveInfo, JobState } from '@rippy/shared';
 
 type BackendCommand = {
   commandId?: string;
@@ -36,6 +36,7 @@ export class BackendClient {
     private config: RipperConfig,
     private onCommand: CommandHandler,
     private log: { info(o: object): void; warn(o: object): void; error(o: object): void },
+    private driveInfo: DriveInfo = {},
   ) {}
 
   start(): void {
@@ -71,7 +72,22 @@ export class BackendClient {
     this.stream.on('error', (err) => this.handleDisconnect(err));
     this.stream.on('end', () => this.handleDisconnect());
     this.stream.on('close', () => this.handleDisconnect());
-    this.send({ hello: { device: this.config.DRIVE_DEVICE, hostname: os.hostname(), autoRip: this.config.AUTO_RIP, outputFormat: this.config.OUTPUT_FORMAT, outputDir: this.config.OUTPUT_DIR } });
+    this.send({ hello: {
+      device: this.config.DRIVE_DEVICE,
+      hostname: os.hostname(),
+      autoRip: this.config.AUTO_RIP,
+      outputFormat: this.config.OUTPUT_FORMAT,
+      outputDir: this.config.OUTPUT_DIR,
+      sgDevice: this.config.SG_DEVICE,
+      driveVendor: this.driveInfo.vendor,
+      driveModel: this.driveInfo.model,
+      driveRevision: this.driveInfo.revision,
+      canOpenTray: this.driveInfo.canOpenTray,
+      canCloseTray: this.driveInfo.canCloseTray,
+      canLockTray: this.driveInfo.canLockTray,
+      canReadDvd: this.driveInfo.canReadDvd,
+      canWriteCdr: this.driveInfo.canWriteCdr,
+    } });
     for (const queued of this.queue.splice(0)) this.stream.write(queued);
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = setInterval(() => this.send({ heartbeat: { status: 'ok' } }), 10_000);

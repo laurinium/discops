@@ -4,6 +4,7 @@ import type { DriveSnapshot, HistoryJob } from '@rippy/shared';
 import './style.css';
 
 interface ApiState { drives: DriveSnapshot[]; history: HistoryJob[] }
+interface StatusData { time: string; host: Record<string, unknown>; musicBrainz: Record<string, unknown>; drives: Array<Record<string, unknown>> }
 const empty: ApiState = { drives: [], history: [] };
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
@@ -93,7 +94,30 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
   </section>;
 }
 
+function StatusPage() {
+  const [status, setStatus] = useState<StatusData>();
+  const [error, setError] = useState<string>();
+  useEffect(() => {
+    const load = () => fetch(`${apiBase}/api/status`).then((r) => r.json()).then(setStatus).catch((e: Error) => setError(e.message));
+    void load();
+    const timer = setInterval(load, 15000);
+    return () => clearInterval(timer);
+  }, []);
+  if (error) return <div className="error">{error}</div>;
+  if (!status) return <section className="history"><h2>Status</h2><p>Loading…</p></section>;
+  return <section className="history statusPage">
+    <h2>Status</h2>
+    <div className="statusGrid">
+      <div><h3>Host</h3><dl>{Object.entries(status.host).filter(([k]) => k !== 'cpus').map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{Array.isArray(v) ? v.join(', ') : String(v)}</dd></React.Fragment>)}</dl></div>
+      <div><h3>MusicBrainz</h3><dl>{Object.entries(status.musicBrainz).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd className={k === 'ok' && v === false ? 'badText' : ''}>{String(v)}</dd></React.Fragment>)}</dl></div>
+    </div>
+    <h3>Drives</h3>
+    <div className="grid">{status.drives.map((drive) => <section className="miniCard" key={String(drive.ripperId)}><pre>{JSON.stringify(drive, null, 2)}</pre></section>)}</div>
+  </section>;
+}
+
 function App() {
+  const [view, setView] = useState<'dashboard' | 'status'>('dashboard');
   const [state, setState] = useState<ApiState>(empty);
   const [error, setError] = useState<string>();
   useEffect(() => {
@@ -105,10 +129,12 @@ function App() {
   }, []);
   const drives = useMemo(() => state.drives, [state.drives]);
   return <main>
-    <header><h1>CD Ripper</h1><p>Automatic abcde ripping dashboard</p></header>
-    {error && <div className="error">{error}</div>}
-    <div className="grid">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <p>No rippers connected yet.</p>}</div>
-    <section className="history"><h2>History</h2><table><thead><tr><th>Started</th><th>Drive</th><th>Album</th><th>Status</th><th>Error</th></tr></thead><tbody>{state.history.map((j) => <tr key={j.id}><td>{j.startedAt}</td><td>{j.ripperId}</td><td>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</td><td>{j.state}</td><td>{j.error}</td></tr>)}</tbody></table></section>
+    <header><h1>CD Ripper</h1><p>Automatic abcde ripping dashboard</p><nav><button onClick={() => setView('dashboard')}>Dashboard</button><button onClick={() => setView('status')}>Status</button></nav></header>
+    {view === 'status' ? <StatusPage /> : <>
+      {error && <div className="error">{error}</div>}
+      <div className="grid">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <p>No rippers connected yet.</p>}</div>
+      <section className="history"><h2>History</h2><table><thead><tr><th>Started</th><th>Drive</th><th>Album</th><th>Status</th><th>Error</th></tr></thead><tbody>{state.history.map((j) => <tr key={j.id}><td>{j.startedAt}</td><td>{j.ripperId}</td><td>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</td><td>{j.state}</td><td>{j.error}</td></tr>)}</tbody></table></section>
+    </>}
   </main>;
 }
 

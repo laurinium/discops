@@ -1,12 +1,23 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 
 export type MediaStatus = 'present' | 'absent' | 'unknown' | 'unsupported';
 export type TrayStatus = 'open' | 'closed' | 'unknown';
 export interface DriveProbe {
   mediaStatus: MediaStatus;
   trayStatus: TrayStatus;
+}
+
+export interface LocalDriveInfo {
+  vendor?: string;
+  model?: string;
+  revision?: string;
+  canOpenTray?: boolean;
+  canCloseTray?: boolean;
+  canLockTray?: boolean;
+  canReadDvd?: boolean;
+  canWriteCdr?: boolean;
 }
 
 async function runProbeCommand(command: string, args: string[], timeoutMs: number): Promise<{ code: number | null; output: string; error?: string }> {
@@ -24,6 +35,41 @@ async function runProbeCommand(command: string, args: string[], timeoutMs: numbe
     child.on('exit', (code) => { clearTimeout(timer); resolve({ code, output }); });
     child.on('error', (err) => { clearTimeout(timer); resolve({ code: null, output, error: err.message }); });
   });
+}
+
+export function readLocalDriveInfo(device: string): LocalDriveInfo {
+  const name = device.split('/').pop();
+  const info: LocalDriveInfo = {};
+  if (!name) return info;
+  try {
+    const vendor = readFileSync(`/sys/block/${name}/device/vendor`, 'utf8').trim();
+    const model = readFileSync(`/sys/block/${name}/device/model`, 'utf8').trim();
+    const revision = readFileSync(`/sys/block/${name}/device/rev`, 'utf8').trim();
+    if (vendor) info.vendor = vendor;
+    if (model) info.model = model;
+    if (revision) info.revision = revision;
+  } catch { /* best effort */ }
+  try {
+    const cdromInfo = readFileSync('/proc/sys/dev/cdrom/info', 'utf8');
+    const lines = Object.fromEntries(cdromInfo.split('\n').map((line) => {
+      const [key, rest] = line.split(':');
+      return [key?.trim(), rest?.trim().split(/\s+/) ?? []];
+    }));
+    const drives = lines['drive name'] ?? [];
+    const idx = drives.indexOf(name);
+    const boolAt = (key: string): boolean | undefined => idx >= 0 && lines[key]?.[idx] !== undefined ? lines[key][idx] === '1' : undefined;
+    const canCloseTray = boolAt('Can close tray');
+    const canOpenTray = boolAt('Can open tray');
+    const canLockTray = boolAt('Can lock tray');
+    const canReadDvd = boolAt('Can read DVD');
+    const canWriteCdr = boolAt('Can write CD-R');
+    if (canCloseTray !== undefined) info.canCloseTray = canCloseTray;
+    if (canOpenTray !== undefined) info.canOpenTray = canOpenTray;
+    if (canLockTray !== undefined) info.canLockTray = canLockTray;
+    if (canReadDvd !== undefined) info.canReadDvd = canReadDvd;
+    if (canWriteCdr !== undefined) info.canWriteCdr = canWriteCdr;
+  } catch { /* best effort */ }
+  return info;
 }
 
 export async function probeDrive(device: string): Promise<DriveProbe> {

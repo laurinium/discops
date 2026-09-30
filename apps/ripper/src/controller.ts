@@ -4,7 +4,7 @@ import type { JobState, TrackMetadata } from '@rippy/shared';
 import { AbcdeRunner } from './abcde.js';
 import { BackendClient, driveState } from './client.js';
 import { markInterruptedJobs } from './armAudio.js';
-import { probeDrive, UdevMonitor, type TrayStatus } from './drive.js';
+import { probeDrive, readLocalDriveInfo, UdevMonitor, type TrayStatus } from './drive.js';
 
 type Logger = { info(o: object): void; warn(o: object): void; error(o: object): void };
 
@@ -34,7 +34,7 @@ export class RipperController {
   private activeJobId?: string;
 
   constructor(private config: RipperConfig, private log: Logger) {
-    this.client = new BackendClient(config, (cmd) => this.handleCommand(cmd), log);
+    this.client = new BackendClient(config, (cmd) => this.handleCommand(cmd), log, readLocalDriveInfo(config.DRIVE_DEVICE));
     this.wireAbcde();
   }
 

@@ -37,6 +37,15 @@ message RipperHello {
   bool auto_rip = 3;
   string output_format = 4;
   string output_dir = 5;
+  optional string sg_device = 6;
+  optional string drive_vendor = 7;
+  optional string drive_model = 8;
+  optional string drive_revision = 9;
+  optional bool can_open_tray = 10;
+  optional bool can_close_tray = 11;
+  optional bool can_lock_tray = 12;
+  optional bool can_read_dvd = 13;
+  optional bool can_write_cdr = 14;
 }
 
 message Heartbeat { string status = 1; }

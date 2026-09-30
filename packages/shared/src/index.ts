@@ -34,9 +34,22 @@ export interface TrackMetadata {
   title: string;
 }
 
+export interface DriveInfo {
+  sgDevice?: string;
+  model?: string;
+  vendor?: string;
+  revision?: string;
+  canOpenTray?: boolean;
+  canCloseTray?: boolean;
+  canLockTray?: boolean;
+  canReadDvd?: boolean;
+  canWriteCdr?: boolean;
+}
+
 export interface DriveSnapshot {
   ripperId: string;
   device: string;
+  driveInfo?: DriveInfo;
   connected: boolean;
   state: JobState;
   mediaPresent: boolean;

@@ -206,6 +206,7 @@ Endpoints:
 
 - `GET /healthz`
 - `GET /api/state`
+- `GET /api/status` (backend hardware summary, drive info, MusicBrainz connectivity)
 - `GET /api/events` (SSE)
 - `POST /api/rippers/:ripperId/startRip`
 - `POST /api/rippers/:ripperId/cancelRip`

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import type { AppState } from './state.js';
 import { openApiDocument } from './openapi.js';
+import { buildStatus } from './status.js';
 
 export function createHttp(state: AppState, corsOrigin: string): express.Express {
   const app = express();
@@ -25,6 +26,9 @@ export function createHttp(state: AppState, corsOrigin: string): express.Express
 </html>`);
   });
   app.get('/api/state', (_req, res) => res.json({ drives: state.listDrives(), history: state.history() }));
+  app.get('/api/status', async (_req, res, next) => {
+    try { res.json(await buildStatus(state)); } catch (err) { next(err); }
+  });
   app.post('/api/rippers/:ripperId/:command', (req, res, next) => {
     try {
       const { ripperId, command } = req.params;

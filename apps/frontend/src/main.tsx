@@ -94,6 +94,52 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
   </section>;
 }
 
+function LogViewer({ drives }: { drives: DriveSnapshot[] }) {
+  const [selected, setSelected] = useState<string>('all');
+  const [query, setQuery] = useState('');
+  const [paused, setPaused] = useState(false);
+  const [snapshot, setSnapshot] = useState<DriveSnapshot[]>(drives);
+
+  useEffect(() => { if (!paused) setSnapshot(drives); }, [drives, paused]);
+
+  const rows = snapshot.flatMap((drive) => drive.logs.map((line, index) => ({
+    id: `${drive.ripperId}-${index}-${line}`,
+    ripperId: drive.ripperId,
+    device: drive.device,
+    line,
+  }))).filter((row) => (selected === 'all' || row.ripperId === selected) && (!query || row.line.toLowerCase().includes(query.toLowerCase()) || row.ripperId.toLowerCase().includes(query.toLowerCase())));
+
+  const download = () => {
+    const body = rows.map((row) => `[${row.ripperId} ${row.device}] ${row.line}`).join('\n');
+    const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rippy-logs-${new Date().toISOString()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return <section className="history logViewer">
+    <div className="sectionHead"><h2>Logs</h2><span className="muted">{rows.length} lines</span></div>
+    <div className="logControls">
+      <select value={selected} onChange={(ev) => setSelected(ev.target.value)}>
+        <option value="all">All drives</option>
+        {drives.map((drive) => <option key={drive.ripperId} value={drive.ripperId}>{drive.ripperId} · {drive.device}</option>)}
+      </select>
+      <input value={query} onChange={(ev) => setQuery(ev.target.value)} placeholder="Filter logs…" />
+      <button onClick={() => setPaused((value) => !value)}>{paused ? 'Resume live' : 'Pause'}</button>
+      <button onClick={download}>Download</button>
+      <button onClick={() => setSnapshot(drives)}>Refresh snapshot</button>
+    </div>
+    <div className="logTable" role="log" aria-live={paused ? 'off' : 'polite'}>
+      {rows.map((row) => <div className="logRow" key={row.id}>
+        <span className="logDrive">{row.ripperId}</span>
+        <span className={row.line.toLowerCase().includes('error') || row.line.toLowerCase().includes('failed') ? 'logLine logError' : 'logLine'}>{row.line}</span>
+      </div>)}
+    </div>
+  </section>;
+}
+
 function StatusPage() {
   const [status, setStatus] = useState<StatusData>();
   const [error, setError] = useState<string>();
@@ -117,7 +163,7 @@ function StatusPage() {
 }
 
 function App() {
-  const [view, setView] = useState<'dashboard' | 'status'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'logs' | 'status'>('dashboard');
   const [state, setState] = useState<ApiState>(empty);
   const [error, setError] = useState<string>();
   useEffect(() => {
@@ -129,8 +175,8 @@ function App() {
   }, []);
   const drives = useMemo(() => state.drives, [state.drives]);
   return <main>
-    <header><h1>CD Ripper</h1><p>Automatic abcde ripping dashboard</p><nav><button onClick={() => setView('dashboard')}>Dashboard</button><button onClick={() => setView('status')}>Status</button></nav></header>
-    {view === 'status' ? <StatusPage /> : <>
+    <header><h1>CD Ripper</h1><p>Automatic abcde ripping dashboard</p><nav><button onClick={() => setView('dashboard')}>Dashboard</button><button onClick={() => setView('logs')}>Logs</button><button onClick={() => setView('status')}>Status</button></nav></header>
+    {view === 'status' ? <StatusPage /> : view === 'logs' ? <LogViewer drives={drives} /> : <>
       {error && <div className="error">{error}</div>}
       <div className="grid">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <p>No rippers connected yet.</p>}</div>
       <section className="history"><h2>History</h2><table><thead><tr><th>Started</th><th>Drive</th><th>Album</th><th>Status</th><th>Error</th></tr></thead><tbody>{state.history.map((j) => <tr key={j.id}><td>{j.startedAt}</td><td>{j.ripperId}</td><td>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</td><td>{j.state}</td><td>{j.error}</td></tr>)}</tbody></table></section>

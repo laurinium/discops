@@ -186,6 +186,197 @@ services:
       - "${RIPPER_SR2_DEVICE:-/dev/sr2}:${RIPPER_SR2_DEVICE:-/dev/sr2}"
       - "${RIPPER_SR2_SG_DEVICE:-/dev/sg2}:${RIPPER_SR2_SG_DEVICE:-/dev/sg2}"
 
+  # Enable with COMPOSE_PROFILES=sr3 or: docker compose --profile sr3 up -d
+  ripper-sr3:
+    <<: *ripper-common
+    profiles: ["sr3"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR3_ID:-drive-04}
+      DRIVE_DEVICE: ${RIPPER_SR3_DEVICE:-/dev/sr3}
+      SG_DEVICE: ${RIPPER_SR3_SG_DEVICE:-/dev/sg4}
+    devices:
+      - "${RIPPER_SR3_DEVICE:-/dev/sr3}:${RIPPER_SR3_DEVICE:-/dev/sr3}"
+      - "${RIPPER_SR3_SG_DEVICE:-/dev/sg4}:${RIPPER_SR3_SG_DEVICE:-/dev/sg4}"
+
+
+  # Enable with COMPOSE_PROFILES=sr4 or: docker compose --profile sr4 up -d
+  ripper-sr4:
+    <<: *ripper-common
+    profiles: ["sr4"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR4_ID:-drive-05}
+      DRIVE_DEVICE: ${RIPPER_SR4_DEVICE:-/dev/sr4}
+      SG_DEVICE: ${RIPPER_SR4_SG_DEVICE:-/dev/sg5}
+    devices:
+      - "${RIPPER_SR4_DEVICE:-/dev/sr4}:${RIPPER_SR4_DEVICE:-/dev/sr4}"
+      - "${RIPPER_SR4_SG_DEVICE:-/dev/sg5}:${RIPPER_SR4_SG_DEVICE:-/dev/sg5}"
+
+
+  # Enable with COMPOSE_PROFILES=sr5 or: docker compose --profile sr5 up -d
+  ripper-sr5:
+    <<: *ripper-common
+    profiles: ["sr5"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR5_ID:-drive-06}
+      DRIVE_DEVICE: ${RIPPER_SR5_DEVICE:-/dev/sr5}
+      SG_DEVICE: ${RIPPER_SR5_SG_DEVICE:-/dev/sg6}
+    devices:
+      - "${RIPPER_SR5_DEVICE:-/dev/sr5}:${RIPPER_SR5_DEVICE:-/dev/sr5}"
+      - "${RIPPER_SR5_SG_DEVICE:-/dev/sg6}:${RIPPER_SR5_SG_DEVICE:-/dev/sg6}"
+
+
+  # Enable with COMPOSE_PROFILES=sr6 or: docker compose --profile sr6 up -d
+  ripper-sr6:
+    <<: *ripper-common
+    profiles: ["sr6"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR6_ID:-drive-07}
+      DRIVE_DEVICE: ${RIPPER_SR6_DEVICE:-/dev/sr6}
+      SG_DEVICE: ${RIPPER_SR6_SG_DEVICE:-/dev/sg7}
+    devices:
+      - "${RIPPER_SR6_DEVICE:-/dev/sr6}:${RIPPER_SR6_DEVICE:-/dev/sr6}"
+      - "${RIPPER_SR6_SG_DEVICE:-/dev/sg7}:${RIPPER_SR6_SG_DEVICE:-/dev/sg7}"
+
+
+  # Enable with COMPOSE_PROFILES=sr7 or: docker compose --profile sr7 up -d
+  ripper-sr7:
+    <<: *ripper-common
+    profiles: ["sr7"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR7_ID:-drive-08}
+      DRIVE_DEVICE: ${RIPPER_SR7_DEVICE:-/dev/sr7}
+      SG_DEVICE: ${RIPPER_SR7_SG_DEVICE:-/dev/sg8}
+    devices:
+      - "${RIPPER_SR7_DEVICE:-/dev/sr7}:${RIPPER_SR7_DEVICE:-/dev/sr7}"
+      - "${RIPPER_SR7_SG_DEVICE:-/dev/sg8}:${RIPPER_SR7_SG_DEVICE:-/dev/sg8}"
+
+
+  # Enable with COMPOSE_PROFILES=sr8 or: docker compose --profile sr8 up -d
+  ripper-sr8:
+    <<: *ripper-common
+    profiles: ["sr8"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR8_ID:-drive-09}
+      DRIVE_DEVICE: ${RIPPER_SR8_DEVICE:-/dev/sr8}
+      SG_DEVICE: ${RIPPER_SR8_SG_DEVICE:-/dev/sg9}
+    devices:
+      - "${RIPPER_SR8_DEVICE:-/dev/sr8}:${RIPPER_SR8_DEVICE:-/dev/sr8}"
+      - "${RIPPER_SR8_SG_DEVICE:-/dev/sg9}:${RIPPER_SR8_SG_DEVICE:-/dev/sg9}"
+
+
+  # Enable with COMPOSE_PROFILES=sr9 or: docker compose --profile sr9 up -d
+  ripper-sr9:
+    <<: *ripper-common
+    profiles: ["sr9"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR9_ID:-drive-10}
+      DRIVE_DEVICE: ${RIPPER_SR9_DEVICE:-/dev/sr9}
+      SG_DEVICE: ${RIPPER_SR9_SG_DEVICE:-/dev/sg10}
+    devices:
+      - "${RIPPER_SR9_DEVICE:-/dev/sr9}:${RIPPER_SR9_DEVICE:-/dev/sr9}"
+      - "${RIPPER_SR9_SG_DEVICE:-/dev/sg10}:${RIPPER_SR9_SG_DEVICE:-/dev/sg10}"
+
+
+  # Enable with COMPOSE_PROFILES=sr10 or: docker compose --profile sr10 up -d
+  ripper-sr10:
+    <<: *ripper-common
+    profiles: ["sr10"]
+    environment:
+      BACKEND_GRPC_ADDR: backend:50051
+      OUTPUT_DIR: /music
+      WORK_DIR: /work
+      OUTPUT_FORMAT: ${OUTPUT_FORMAT:-flac}
+      AUTO_RIP: ${AUTO_RIP:-true}
+      EJECT_ON_SUCCESS: ${EJECT_ON_SUCCESS:-true}
+      EJECT_ON_FAILURE: ${EJECT_ON_FAILURE:-false}
+      UDEV_MONITOR: ${UDEV_MONITOR:-true}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ABCDE_CONFIG: ${ABCDE_CONFIG:-}
+      RIPPER_ID: ${RIPPER_SR10_ID:-drive-11}
+      DRIVE_DEVICE: ${RIPPER_SR10_DEVICE:-/dev/sr10}
+      SG_DEVICE: ${RIPPER_SR10_SG_DEVICE:-/dev/sg11}
+    devices:
+      - "${RIPPER_SR10_DEVICE:-/dev/sr10}:${RIPPER_SR10_DEVICE:-/dev/sr10}"
+      - "${RIPPER_SR10_SG_DEVICE:-/dev/sg11}:${RIPPER_SR10_SG_DEVICE:-/dev/sg11}"
+
 networks:
   rippy:
     driver: bridge

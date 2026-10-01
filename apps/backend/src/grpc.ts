@@ -83,18 +83,20 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
         if ('heartbeat' in msg) state.patch(ripperId, { connected: true });
         if ('driveState' in msg && msg.driveState && typeof msg.driveState === 'object') {
           const d = msg.driveState as Event;
+          const nextState = (str(d.state) ?? 'idle') as JobState;
           state.patch(ripperId, defined<Partial<DriveSnapshot>>({
-            device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: (str(d.state) ?? 'idle') as JobState,
+            device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: nextState,
             trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), currentJobId: str(d.jobId), artist: str(d.artist), album: str(d.album),
             releaseDate: str(d.releaseDate), musicBrainzDiscId: str(d.musicBrainzDiscId), musicBrainzReleaseId: str(d.musicBrainzReleaseId),
             discNumber: num(d.discNumber), totalDiscs: num(d.totalDiscs), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
             progressPercent: num(d.progressPercent), currentFile: str(d.currentFile), error: str(d.error),
           }));
+          if (['idle', 'disc-detected', 'ejected'].includes(nextState)) state.patch(ripperId, { currentJobId: undefined, currentTrack: undefined, currentFile: undefined, progressPercent: 0, error: undefined });
         }
         if ('discEvent' in msg && msg.discEvent && typeof msg.discEvent === 'object') {
           const d = msg.discEvent as Event;
           const type = str(d.type);
-          state.patch(ripperId, defined<Partial<DriveSnapshot>>({ mediaPresent: type !== 'DISC_REMOVED', state: type === 'UNSUPPORTED_MEDIA' ? 'unsupported' : type === 'DISC_REMOVED' ? 'ejected' : 'disc-detected', error: str(d.reason) }));
+          state.patch(ripperId, { mediaPresent: type !== 'DISC_REMOVED', state: type === 'UNSUPPORTED_MEDIA' ? 'unsupported' : type === 'DISC_REMOVED' ? 'ejected' : 'disc-detected', error: str(d.reason), currentJobId: undefined, currentTrack: undefined, currentFile: undefined, progressPercent: 0 });
         }
         if ('ripLog' in msg && msg.ripLog && typeof msg.ripLog === 'object') {
           const l = msg.ripLog as Event;
@@ -108,14 +110,14 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const type = str(r.type);
           const jobId = str(r.jobId) ?? 'unknown';
           if (type === 'RIP_STARTED') {
-            state.patch(ripperId, { currentJobId: jobId, error: undefined, progressPercent: 0, currentTrack: undefined, currentFile: undefined });
+            state.patch(ripperId, { currentJobId: jobId, artist: undefined, album: undefined, tracks: [], error: undefined, progressPercent: 0, currentTrack: undefined, totalTracks: undefined, currentFile: undefined });
             state.recordJob(defined<HistoryJob>({ id: jobId, ripperId, device: state.listDrives().find((d) => d.ripperId === ripperId)?.device ?? 'unknown', state: 'ripping', startedAt: new Date().toISOString() }));
           }
-          if (type === 'RIP_PROGRESS') state.patch(ripperId, defined<Partial<DriveSnapshot>>({
+          if (type === 'RIP_PROGRESS') state.patch(ripperId, {
             state: 'ripping', error: undefined, currentTrack: num(r.currentTrack), totalTracks: num(r.totalTracks), progressPercent: num(r.progressPercent), currentFile: str(r.currentFile),
             artist: str(r.artist), album: str(r.album), releaseDate: str(r.releaseDate), musicBrainzDiscId: str(r.musicBrainzDiscId), musicBrainzReleaseId: str(r.musicBrainzReleaseId),
             discNumber: num(r.discNumber), totalDiscs: num(r.totalDiscs),
-          }));
+          });
           if (type === 'RIP_COMPLETED') { state.patch(ripperId, { state: 'completed', progressPercent: 100, error: undefined, currentJobId: undefined }); state.finishJob(jobId, 'completed'); state.completeRippedAlbum(jobId, ripperId); }
           if (type === 'RIP_FAILED') { state.patch(ripperId, { state: 'failed', error: str(r.error), currentJobId: undefined }); state.finishJob(jobId, 'failed', str(r.error)); }
           if (type === 'RIP_CANCELLED') { state.patch(ripperId, { state: 'cancelled', error: str(r.error), currentJobId: undefined }); state.finishJob(jobId, 'cancelled', str(r.error)); }

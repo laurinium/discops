@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, AlertTriangle, Disc3, Download, Eject, Pause, Play, RefreshCw, RotateCcw, Search, Server, Wifi } from 'lucide-react';
+import { Activity, AlertTriangle, Disc3, Download, Eject, ListMusic, Pause, Play, RefreshCw, RotateCcw, Search, Server, Wifi } from 'lucide-react';
 import type { DriveSnapshot, HistoryJob, RippedAlbum } from '@rippy/shared';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './components/ui/alert-dialog.js';
 import { Badge } from './components/ui/badge.js';
@@ -52,47 +52,65 @@ function statusText(drive: DriveSnapshot): string {
 
 function DriveCard({ drive }: { drive: DriveSnapshot }) {
   const pct = Math.round(drive.progressPercent ?? 0);
-  const art = useAlbumArt(drive.artist, drive.album);
   const tracks = drive.tracks ?? [];
-  const active = drive.state === 'ripping' || drive.state === 'reading-metadata';
-  return <Card className={active ? 'border-emerald-500/50 shadow-emerald-950/40' : ''}>
-    <CardHeader className="pb-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><CardTitle className="truncate text-base">{drive.ripperId}</CardTitle><CardDescription>{drive.device}{drive.driveInfo?.sgDevice ? ` · ${drive.driveInfo.sgDevice}` : ''}</CardDescription></div>
-        <Badge variant={drive.connected ? 'success' : 'destructive'}>{drive.connected ? 'online' : 'offline'}</Badge>
-      </div>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      <div className="flex gap-3">
-        <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">
-          {art ? <img src={art} alt={`${drive.artist ?? 'Unknown'} - ${drive.album ?? 'album'} cover`} className="h-full w-full object-cover" /> : <Disc3 className="h-7 w-7" />}
+  const active = drive.state === 'ripping' || drive.state === 'reading-metadata' || drive.state === 'encoding';
+  const failed = drive.state.startsWith('failed') || drive.state === 'failed';
+  return <Card className={active ? 'border-emerald-500/50 shadow-emerald-950/40' : failed ? 'border-destructive/50' : ''}>
+    <CardContent className="space-y-2 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><CardTitle className="truncate text-sm">{drive.ripperId}</CardTitle><Badge variant={drive.connected ? 'success' : 'destructive'}>{drive.connected ? 'on' : 'off'}</Badge></div>
+          <div className="truncate text-[11px] text-muted-foreground">{drive.device}{drive.driveInfo?.sgDevice ? ` · ${drive.driveInfo.sgDevice}` : ''}</div>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-300"><Activity className="h-3 w-3" />{statusText(drive)}</div>
-          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-tight">{drive.album ?? (drive.mediaPresent ? 'Metadata pending…' : 'No album loaded')}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">{drive.artist ?? 'Unknown artist'}{drive.discNumber ? ` · Disc ${drive.discNumber}${drive.totalDiscs ? `/${drive.totalDiscs}` : ''}` : ''}</div>
-        </div>
+        <DriveDetailsDialog drive={drive} />
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <Info label="State" value={drive.state} /><Info label="Media" value={drive.mediaPresent ? 'present' : 'none'} /><Info label="Tray" value={drive.trayStatus ?? 'unknown'} />
+      <div className="min-w-0">
+        <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-300"><Activity className="h-3 w-3" />{statusText(drive)}</div>
+        <div className="truncate text-sm font-semibold">{drive.album ?? (drive.mediaPresent ? 'Metadata pending…' : 'No album loaded')}</div>
+        <div className="truncate text-[11px] text-muted-foreground">{drive.artist ?? 'Unknown artist'}{drive.discNumber ? ` · Disc ${drive.discNumber}${drive.totalDiscs ? `/${drive.totalDiscs}` : ''}` : ''}</div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px]">
+        <Info label="State" value={drive.state} /><Info label="Tray" value={drive.trayStatus ?? 'unknown'} />
+        {drive.currentTrack && <Info label="Track" value={`${drive.currentTrack}/${drive.totalTracks ?? (tracks.length || '?')}`} />}
         {drive.currentJobId && <Info label="Job" value={drive.currentJobId.slice(0, 8)} title={drive.currentJobId} />}
-        {drive.currentTrack && <Info label="Track" value={`${drive.currentTrack} / ${drive.totalTracks ?? (tracks.length || '?')}`} />}
-        {drive.currentFile && <Info label="File" value={drive.currentFile} />}
       </div>
-      {drive.error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive-foreground"><AlertTriangle className="mr-1 inline h-3 w-3" />{drive.error}</div>}
-      <div><Progress value={pct} /><div className="mt-1 text-right text-xs text-muted-foreground">{pct}%</div></div>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => void command(drive.ripperId, 'startRip')} disabled={!drive.connected || !drive.mediaPresent || drive.state === 'ripping'}><Play className="h-3.5 w-3.5" />Start</Button>
-        <Button size="sm" variant="secondary" onClick={() => void command(drive.ripperId, 'cancelRip')} disabled={drive.state !== 'ripping'}><Pause className="h-3.5 w-3.5" />Cancel</Button>
-        <Button size="sm" variant="outline" onClick={() => void command(drive.ripperId, 'ejectDisc')}><Eject className="h-3.5 w-3.5" />{drive.trayStatus === 'open' ? 'Close' : 'Eject'}</Button>
-        <Button size="sm" variant="outline" onClick={() => void command(drive.ripperId, 'refreshDisc')}><RefreshCw className="h-3.5 w-3.5" />Refresh</Button>
-        <AlertDialog><AlertDialogTrigger asChild><Button size="sm" variant="destructive"><RotateCcw className="h-3.5 w-3.5" />Reset</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Reset optical drive?</AlertDialogTitle><AlertDialogDescription>This will cancel any active rip on {drive.ripperId} and issue a SCSI device reset. Use only for stuck drives or repeated read errors.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => void command(drive.ripperId, 'resetDrive')}>Reset drive</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      {drive.error && <div className="line-clamp-2 rounded-md border border-destructive/40 bg-destructive/10 p-1.5 text-[11px] text-red-200"><AlertTriangle className="mr-1 inline h-3 w-3" />{drive.error}</div>}
+      <div className="flex items-center gap-2"><Progress value={pct} className="h-1.5" /><span className="w-8 text-right text-[11px] text-muted-foreground">{pct}%</span></div>
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" className="h-7 px-2" onClick={() => void command(drive.ripperId, 'startRip')} disabled={!drive.connected || !drive.mediaPresent || active}><Play className="h-3 w-3" />Start</Button>
+        <Button size="sm" className="h-7 px-2" variant="secondary" onClick={() => void command(drive.ripperId, 'cancelRip')} disabled={!active}><Pause className="h-3 w-3" />Cancel</Button>
+        <Button size="sm" className="h-7 px-2" variant="outline" onClick={() => void command(drive.ripperId, 'ejectDisc')}><Eject className="h-3 w-3" />{drive.trayStatus === 'open' ? 'Close' : 'Eject'}</Button>
+        <Button size="sm" className="h-7 px-2" variant="outline" onClick={() => void command(drive.ripperId, 'refreshDisc')}><RefreshCw className="h-3 w-3" /></Button>
+        <AlertDialog><AlertDialogTrigger asChild><Button size="sm" className="h-7 px-2" variant="destructive"><RotateCcw className="h-3 w-3" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Reset optical drive?</AlertDialogTitle><AlertDialogDescription>This will cancel any active rip on {drive.ripperId} and issue a SCSI device reset. Use only for stuck drives or repeated read errors.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => void command(drive.ripperId, 'resetDrive')}>Reset drive</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       </div>
-      {tracks.length > 0 && <div className="max-h-44 overflow-auto rounded-md border bg-muted/20 p-2"><div className="mb-1 text-xs font-semibold text-muted-foreground">Tracks</div>{tracks.map((track) => <div key={track.number} className={`grid grid-cols-[2rem_1fr] rounded px-2 py-1 text-xs ${track.number === drive.currentTrack ? 'bg-emerald-500/20 text-emerald-100' : ''}`}><span className="text-muted-foreground">{String(track.number).padStart(2, '0')}</span><span className="truncate">{track.title}</span></div>)}</div>}
-      <pre className="max-h-32 overflow-auto rounded-md border bg-black/30 p-2 font-mono text-[11px] text-muted-foreground">{drive.logs.slice(-24).join('\n')}</pre>
     </CardContent>
   </Card>;
+}
+
+function DriveDetailsDialog({ drive }: { drive: DriveSnapshot }) {
+  const art = useAlbumArt(drive.artist, drive.album);
+  const tracks = drive.tracks ?? [];
+  return <AlertDialog>
+    <AlertDialogTrigger asChild><Button size="sm" variant="outline" className="h-7 px-2"><ListMusic className="h-3.5 w-3.5" />Details</Button></AlertDialogTrigger>
+    <AlertDialogContent className="max-h-[90vh] overflow-auto">
+      <AlertDialogHeader>
+        <AlertDialogTitle>{drive.ripperId} · {drive.album ?? 'No album loaded'}</AlertDialogTitle>
+        <AlertDialogDescription>{drive.artist ?? 'Unknown artist'} · {drive.device}{drive.discNumber ? ` · Disc ${drive.discNumber}${drive.totalDiscs ? `/${drive.totalDiscs}` : ''}` : ''}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <div className="space-y-4">
+        <div className="flex gap-3">
+          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">{art ? <img src={art} alt="Album cover" className="h-full w-full object-cover" /> : <Disc3 className="h-8 w-8" />}</div>
+          <div className="grid flex-1 grid-cols-[6rem_1fr] gap-1 text-sm"><Info label="State" value={drive.state} /><Info label="Media" value={drive.mediaPresent ? 'present' : 'none'} /><Info label="Tray" value={drive.trayStatus ?? 'unknown'} />{drive.currentJobId && <Info label="Job" value={drive.currentJobId} />}{drive.currentFile && <Info label="File" value={drive.currentFile} />}</div>
+        </div>
+        {drive.error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-red-200"><AlertTriangle className="mr-1 inline h-4 w-4" />{drive.error}</div>}
+        <div className="rounded-md border bg-muted/20 p-2"><div className="mb-2 text-xs font-semibold text-muted-foreground">Tracks ({tracks.length})</div>{tracks.length ? tracks.map((track) => <div key={track.number} className={`grid grid-cols-[2.5rem_1fr] rounded px-2 py-1 text-sm ${track.number === drive.currentTrack ? 'bg-emerald-500/20 text-emerald-100' : ''}`}><span className="text-muted-foreground">{String(track.number).padStart(2, '0')}</span><span>{track.title}</span></div>) : <div className="text-sm text-muted-foreground">No tracks captured yet.</div>}</div>
+        <pre className="max-h-72 overflow-auto rounded-md border bg-black/30 p-3 font-mono text-xs text-muted-foreground">{drive.logs.slice(-120).join('\n')}</pre>
+      </div>
+      <AlertDialogFooter><AlertDialogCancel>Close</AlertDialogCancel></AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>;
 }
 
 function Info({ label, value, title }: { label: string; value: string; title?: string }) { return <><span className="text-muted-foreground">{label}</span><span className="truncate" title={title ?? value}>{value}</span></>; }
@@ -147,7 +165,7 @@ function App() {
   const [error, setError] = useState<string>();
   useEffect(() => { fetch(`${apiBase}/api/state`).then((r) => r.json()).then(setState).catch((e: Error) => setError(e.message)); const es = new EventSource(`${apiBase}/api/events`); es.onmessage = (ev) => { setState(JSON.parse(ev.data) as ApiState); setError(undefined); }; es.onerror = () => setError('live connection interrupted'); return () => es.close(); }, []);
   const drives = useMemo(() => state.drives, [state.drives]);
-  return <main className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6"><header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><h1 className="text-3xl font-bold tracking-tight md:text-4xl">DiscOps</h1><p className="text-muted-foreground">Multi-drive abcde ripping dashboard</p></div></header>{error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-red-200">{error}</div>}<Tabs defaultValue="dashboard" className="space-y-4"><TabsList><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="albums">Albums</TabsTrigger><TabsTrigger value="logs">Logs</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList><TabsContent value="dashboard" className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <Card><CardContent className="p-6 text-muted-foreground">No rippers connected yet.</CardContent></Card>}</div><History history={state.history} /></TabsContent><TabsContent value="albums"><AlbumsPage albums={state.albums ?? []} /></TabsContent><TabsContent value="logs"><LogViewer drives={drives} /></TabsContent><TabsContent value="status"><StatusPage /></TabsContent></Tabs></main>;
+  return <main className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6"><header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><h1 className="text-3xl font-bold tracking-tight md:text-4xl">DiscOps</h1><p className="text-muted-foreground">Multi-drive abcde ripping dashboard</p></div></header>{error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-red-200">{error}</div>}<Tabs defaultValue="dashboard" className="space-y-4"><TabsList><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="albums">Albums</TabsTrigger><TabsTrigger value="logs">Logs</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList><TabsContent value="dashboard" className="space-y-4"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <Card><CardContent className="p-6 text-muted-foreground">No rippers connected yet.</CardContent></Card>}</div><History history={state.history} /></TabsContent><TabsContent value="albums"><AlbumsPage albums={state.albums ?? []} /></TabsContent><TabsContent value="logs"><LogViewer drives={drives} /></TabsContent><TabsContent value="status"><StatusPage /></TabsContent></Tabs></main>;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

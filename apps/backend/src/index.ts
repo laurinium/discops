@@ -7,6 +7,8 @@ import { Store } from './store.js';
 
 const config = BackendEnv.parse(process.env);
 const store = new Store(config.DATABASE_PATH);
+const interrupted = store.markActiveJobsInterrupted('Backend restarted while job was active');
+if (interrupted > 0) logger.warn({ event: 'active_jobs_marked_interrupted', count: interrupted });
 const state = new AppState(store);
 seedExpectedRippers(config.EXPECTED_RIPPERS, state);
 const grpcServer = startGrpc(state, config.BACKEND_GRPC_PORT);

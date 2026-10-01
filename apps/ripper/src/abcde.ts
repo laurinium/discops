@@ -17,13 +17,16 @@ import { lookupMusicBrainzDisc, type MusicBrainzDiscMetadata } from './musicbrai
 
 export interface AbcdeOptions { device: string; outputDir: string; workDir: string; outputFormat: string; }
 export interface Progress { currentTrack?: number; totalTracks?: number; progressPercent?: number; currentFile?: string; phase?: string; }
+export type CancelReason = 'USER_CANCEL' | 'EJECT_REQUEST' | 'RESET_REQUEST' | 'CONTAINER_SHUTDOWN';
 export interface RipFailure { jobId: string; error: string; failureType: ArmFailureType; exitCode?: number | null; signal?: NodeJS.Signals | null; }
+export interface RipCancelled { jobId: string; reason: CancelReason; signal?: NodeJS.Signals | null; }
 
 export class AbcdeRunner extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | undefined;
   private childPid: number | undefined;
   private starting = false;
   private cancelled = false;
+  private cancelReason: CancelReason = 'USER_CANCEL';
   private currentJobId: string | undefined;
   private currentPaths: JobPaths | undefined;
   get running(): boolean { return this.starting || this.child !== undefined; }
@@ -31,6 +34,7 @@ export class AbcdeRunner extends EventEmitter {
   start(opts: AbcdeOptions): string {
     if (this.running) throw new Error('abcde already running');
     this.cancelled = false;
+    this.cancelReason = 'USER_CANCEL';
     this.starting = true;
     const jobId = crypto.randomUUID();
     const paths = createJobPaths(opts.workDir, jobId);
@@ -114,8 +118,8 @@ export class AbcdeRunner extends EventEmitter {
           this.childPid = undefined;
           this.starting = false;
           if (this.cancelled) {
-            this.markTerminal(paths, 'CANCELLED');
-            this.emit('cancelled', { jobId });
+            this.markTerminal(paths, 'CANCELLED', this.cancelReason);
+            this.emit('cancelled', { jobId, reason: this.cancelReason, signal });
             return;
           }
           try {
@@ -152,16 +156,18 @@ export class AbcdeRunner extends EventEmitter {
     return jobId;
   }
 
-  cancel(): void {
+  cancel(reason: CancelReason = 'USER_CANCEL'): void {
     this.cancelled = true;
+    this.cancelReason = reason;
     if (!this.child) return;
-    this.terminateProcessGroup('SIGTERM');
-    setTimeout(() => this.terminateProcessGroup('SIGKILL'), 10_000).unref();
+    const pid = this.childPid;
+    this.terminateProcessGroup(pid, 'SIGTERM');
+    setTimeout(() => this.terminateProcessGroup(pid, 'SIGKILL'), 10_000).unref();
   }
 
-  private terminateProcessGroup(signal: NodeJS.Signals): void {
-    if (!this.childPid) return;
-    try { process.kill(-this.childPid, signal); } catch { this.child?.kill(signal); }
+  private terminateProcessGroup(pid: number | undefined, signal: NodeJS.Signals): void {
+    if (!pid) return;
+    try { process.kill(-pid, signal); } catch { if (pid === this.childPid) this.child?.kill(signal); }
   }
 
   private fail(jobId: string, paths: JobPaths, failureType: ArmFailureType, error: string, exitCode?: number | null, signal?: NodeJS.Signals | null): void {
@@ -172,9 +178,9 @@ export class AbcdeRunner extends EventEmitter {
     this.emit('failed', { jobId, error, failureType, ...(exitCode !== undefined ? { exitCode } : {}), ...(signal !== undefined ? { signal } : {}) } satisfies RipFailure);
   }
 
-  private markTerminal(paths: JobPaths, marker: 'COMPLETED' | 'FAILED' | 'CANCELLED'): void {
+  private markTerminal(paths: JobPaths, marker: 'COMPLETED' | 'FAILED' | 'CANCELLED', detail?: string): void {
     if (existsSync(`${paths.workDir}/RUNNING`)) rmSync(`${paths.workDir}/RUNNING`, { force: true });
-    writeFileSync(`${paths.workDir}/${marker}`, new Date().toISOString());
+    writeFileSync(`${paths.workDir}/${marker}`, [new Date().toISOString(), detail].filter(Boolean).join('\n'));
   }
 }
 

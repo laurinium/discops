@@ -7,6 +7,7 @@ export type ArmFailureType = 'FAILED_READ' | 'FAILED_ENCODE' | 'FAILED_VERIFY' |
 export interface TrackExpectation { discId?: string; expectedTracks: number; }
 export interface JobPaths { workDir: string; stagingDir: string; publishDir: string; logDir: string; wavDir: string; abcdeConfig: string; stdoutLog: string; stderrLog: string; }
 export interface ValidationResult { ok: boolean; failureType?: ArmFailureType; error?: string; flacFiles: string[]; expectedTracks: number; completedTracks: number; }
+export interface ClassifiedAbcdeFailure { failureType: ArmFailureType; reason: string; }
 interface PersistedMusicBrainzMetadata { discNumber?: number; totalDiscs?: number; musicBrainzDiscId?: string; releaseId?: string; releaseDate?: string; }
 interface PersistedJobMetadata { musicBrainz?: PersistedMusicBrainzMetadata; }
 
@@ -111,7 +112,10 @@ export function applyMusicBrainzDiscMetadata(paths: JobPaths): void {
 
 export function validateCompletedRip(paths: JobPaths, expectedTracks: number, abcdeExitCode: number | null): ValidationResult {
   const flacFiles = listFiles(paths.stagingDir, '.flac');
-  if (abcdeExitCode !== 0) return { ok: false, failureType: classifyAbcdeFailure(paths), error: `abcde exited with code ${abcdeExitCode}`, flacFiles, expectedTracks, completedTracks: flacFiles.length };
+  if (abcdeExitCode !== 0) {
+    const classified = classifyAbcdeFailure(paths);
+    return { ok: false, failureType: classified.failureType, error: `${classified.reason}; abcde exited with code ${abcdeExitCode}`, flacFiles, expectedTracks, completedTracks: flacFiles.length };
+  }
   if (expectedTracks <= 0) return { ok: false, failureType: 'FAILED_METADATA', error: 'could not determine expected audio track count', flacFiles, expectedTracks, completedTracks: flacFiles.length };
   if (flacFiles.length !== expectedTracks) return { ok: false, failureType: 'FAILED_VERIFY', error: `expected ${expectedTracks} FLAC files but found ${flacFiles.length}`, flacFiles, expectedTracks, completedTracks: flacFiles.length };
   const bad = flacFiles.find((file) => !verifyFlac(file));
@@ -119,12 +123,25 @@ export function validateCompletedRip(paths: JobPaths, expectedTracks: number, ab
   return { ok: true, flacFiles, expectedTracks, completedTracks: flacFiles.length };
 }
 
-function classifyAbcdeFailure(paths: JobPaths): ArmFailureType {
+export function classifyAbcdeFailure(paths: JobPaths): ClassifiedAbcdeFailure {
   const text = [safeRead(paths.stdoutLog), safeRead(paths.stderrLog)].join('\n').toLowerCase();
-  if (text.includes('musicbrainz') && (text.includes('failed') || text.includes('no matches'))) return 'FAILED_METADATA';
-  if (text.includes('encode') || text.includes('flac')) return 'FAILED_ENCODE';
-  if (text.includes('scsi_read') || text.includes('cdparanoia') || text.includes('readtrack')) return 'FAILED_READ';
-  return 'UNKNOWN_ERROR';
+  const hasAny = (...needles: string[]) => needles.some((needle) => text.includes(needle));
+  if (hasAny('temporary failure in name resolution', "can't connect", 'network is unreachable', 'connection timed out')) {
+    return { failureType: 'FAILED_METADATA', reason: 'metadata lookup failed due to network/DNS error' };
+  }
+  if (text.includes('musicbrainz') && hasAny('failed', 'no matches', 'not found', 'abort')) {
+    return { failureType: 'FAILED_METADATA', reason: 'musicbrainz metadata lookup failed' };
+  }
+  if (hasAny('medium not present', 'tray open', 'not ready:medium', 'no medium')) {
+    return { failureType: 'FAILED_INTERRUPTED', reason: 'drive reported medium removed or tray open' };
+  }
+  if (hasAny('scsi_read', 'l-ec uncorrectable', 'medium error', 'i/o error', 'input/output error', 'read error', 'cdparanoia')) {
+    return { failureType: 'FAILED_READ', reason: 'disc read error reported by drive/cdparanoia' };
+  }
+  if (hasAny('flac', 'encode', 'encoder', 'tagging')) {
+    return { failureType: 'FAILED_ENCODE', reason: 'encoding or tagging failed' };
+  }
+  return { failureType: 'UNKNOWN_ERROR', reason: 'abcde failed with an unclassified error' };
 }
 
 function pathHasFileCollision(src: string, dest: string): boolean {

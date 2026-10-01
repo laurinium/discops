@@ -30,6 +30,11 @@ export class Store {
   finishJob(id: string, state: JobState, error?: string): void {
     this.db.prepare('UPDATE jobs SET state=?, finished_at=?, error=COALESCE(?, error) WHERE id=?').run(state, new Date().toISOString(), error, id);
   }
+  markActiveJobsInterrupted(reason: string): number {
+    const terminal = ['completed', 'failed', 'failed-metadata', 'failed-read', 'failed-encode', 'failed-verify', 'failed-finalize', 'failed-interrupted', 'cancelled', 'ejected', 'unsupported'];
+    const result = this.db.prepare(`UPDATE jobs SET state='failed-interrupted', finished_at=?, error=COALESCE(error, ?) WHERE state NOT IN (${terminal.map(() => '?').join(',')})`).run(new Date().toISOString(), reason, ...terminal);
+    return result.changes;
+  }
   upsertRippedAlbum(album: RippedAlbum): void {
     this.db.prepare(`INSERT INTO ripped_albums(job_id,ripper_id,device,artist,album,release_date,musicbrainz_disc_id,musicbrainz_release_id,disc_number,total_discs,tracks_json,completed_at)
       VALUES (@jobId,@ripperId,@device,@artist,@album,@releaseDate,@musicBrainzDiscId,@musicBrainzReleaseId,@discNumber,@totalDiscs,@tracksJson,@completedAt)

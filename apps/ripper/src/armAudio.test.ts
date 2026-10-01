@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { atomicPublish, createJobPaths, markInterruptedJobs, prepareFreshJob, sanitizePathSegment, validateCompletedRip } from './armAudio.js';
+import { atomicPublish, classifyAbcdeFailure, createJobPaths, markInterruptedJobs, prepareFreshJob, sanitizePathSegment, validateCompletedRip } from './armAudio.js';
 
 let root = '';
 let oldPath = '';
@@ -49,6 +49,17 @@ describe('ARM-style audio orchestration helpers', () => {
     const validation = validateCompletedRip(paths, 12, 1);
     expect(validation.ok).toBe(false);
     expect(validation.failureType).toBe('UNKNOWN_ERROR');
+    expect(validation.error).toContain('unclassified');
+  });
+
+  it('classifies known abcde and drive failure logs', () => {
+    const paths = makeFlacs(0);
+    writeFileSync(paths.stderrLog, "Can't connect: Temporary failure in name resolution\n");
+    expect(classifyAbcdeFailure(paths)).toEqual({ failureType: 'FAILED_METADATA', reason: 'metadata lookup failed due to network/DNS error' });
+    writeFileSync(paths.stderrLog, 'cdparanoia: scsi_read error: MEDIUM ERROR\n');
+    expect(classifyAbcdeFailure(paths).failureType).toBe('FAILED_READ');
+    writeFileSync(paths.stderrLog, 'Scsi error - NOT READY:MEDIUM NOT PRESENT - TRAY OPEN\n');
+    expect(classifyAbcdeFailure(paths).failureType).toBe('FAILED_INTERRUPTED');
   });
 
   it('fails when abcde creates fewer FLACs despite exit zero', () => {

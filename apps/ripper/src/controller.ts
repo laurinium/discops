@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { RipperConfig } from '@rippy/config';
 import type { JobState, TrackMetadata } from '@rippy/shared';
-import { AbcdeRunner } from './abcde.js';
+import { AbcdeRunner, type CancelReason } from './abcde.js';
 import { BackendClient, driveState } from './client.js';
 import { markInterruptedJobs } from './armAudio.js';
 import { probeDrive, readLocalDriveInfo, UdevMonitor, type TrayStatus } from './drive.js';
@@ -31,7 +31,9 @@ export class RipperController {
   private artist: string | undefined;
   private album: string | undefined;
   private tracks: TrackMetadata[] = [];
-  private activeJobId?: string;
+  private activeJobId: string | undefined;
+
+  get running(): boolean { return this.abcde.running; }
 
   constructor(private config: RipperConfig, private log: Logger) {
     this.client = new BackendClient(config, (cmd) => this.handleCommand(cmd), log, readLocalDriveInfo(config.DRIVE_DEVICE));
@@ -54,7 +56,7 @@ export class RipperController {
   }
 
   stop(): void {
-    this.abcde.cancel();
+    this.abcde.cancel('CONTAINER_SHUTDOWN');
     this.udev?.stop();
     if (this.poll) clearInterval(this.poll);
     this.client.stop();
@@ -89,6 +91,7 @@ export class RipperController {
       this.log.info({ event: 'rip_completed', jobId, expectedTracks, completedTracks, device: this.config.DRIVE_DEVICE });
       this.setState('completed', { progressPercent: 100, totalTracks: expectedTracks });
       this.client.send({ ripEvent: { type: 'RIP_COMPLETED', jobId } });
+      this.activeJobId = undefined;
       if (this.config.EJECT_ON_SUCCESS) this.openTrayAfterCompletion();
     });
     this.abcde.on('failed', ({ jobId, error, failureType }: { jobId: string; error: string; failureType?: string }) => {
@@ -96,9 +99,15 @@ export class RipperController {
       const message = failureType ? `${failureType}: ${error}` : error;
       this.setState(failureTypeToState(failureType), { error: message });
       this.client.send({ ripEvent: { type: 'RIP_FAILED', jobId, error: message } });
+      this.activeJobId = undefined;
       if (this.config.EJECT_ON_FAILURE) this.openTrayAfterCompletion();
     });
-    this.abcde.on('cancelled', ({ jobId }: { jobId: string }) => { this.setState('cancelled'); this.client.send({ ripEvent: { type: 'RIP_CANCELLED', jobId } }); });
+    this.abcde.on('cancelled', ({ jobId, reason }: { jobId: string; reason: CancelReason }) => {
+      const message = `Cancelled: ${reason}`;
+      this.setState('cancelled', { error: message });
+      this.client.send({ ripEvent: { type: 'RIP_CANCELLED', jobId, error: message } });
+      this.activeJobId = undefined;
+    });
   }
 
   private async refresh(source: string): Promise<void> {
@@ -153,7 +162,7 @@ export class RipperController {
 
   private handleCommand(command: BackendCommand): void {
     if (command.startRip) this.startRip();
-    if (command.cancelRip) this.abcde.cancel();
+    if (command.cancelRip) this.abcde.cancel('USER_CANCEL');
     if (command.ejectDisc) this.eject();
     if (command.refreshDisc) void this.refresh('command');
     if (command.resetDrive) this.resetDrive();
@@ -183,7 +192,7 @@ export class RipperController {
   }
 
   private resetDrive(): void {
-    if (this.abcde.running) this.abcde.cancel();
+    if (this.abcde.running) this.abcde.cancel('RESET_REQUEST');
     const target = this.config.SG_DEVICE ?? this.config.DRIVE_DEVICE;
     this.log.warn({ event: 'drive_reset_requested', device: this.config.DRIVE_DEVICE, resetDevice: target });
     this.client.send({ ripLog: { jobId: this.activeJobId ?? 'drive-reset', stream: 'system', line: `Resetting optical drive via sg_reset --device ${target}` } });
@@ -200,7 +209,7 @@ export class RipperController {
   }
 
   private eject(): void {
-    if (this.abcde.running) this.abcde.cancel();
+    if (this.abcde.running) this.abcde.cancel('EJECT_REQUEST');
     const closing = this.trayStatus === 'open';
     const args = closing ? ['-t', this.config.DRIVE_DEVICE] : [this.config.DRIVE_DEVICE];
     const child = spawn('eject', args, { stdio: 'ignore' });

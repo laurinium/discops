@@ -5,6 +5,8 @@ import type { CancelRip as _rippy_v1_CancelRip, CancelRip__Output as _rippy_v1_C
 import type { EjectDisc as _rippy_v1_EjectDisc, EjectDisc__Output as _rippy_v1_EjectDisc__Output } from '../../rippy/v1/EjectDisc';
 import type { RefreshDisc as _rippy_v1_RefreshDisc, RefreshDisc__Output as _rippy_v1_RefreshDisc__Output } from '../../rippy/v1/RefreshDisc';
 import type { ResetDrive as _rippy_v1_ResetDrive, ResetDrive__Output as _rippy_v1_ResetDrive__Output } from '../../rippy/v1/ResetDrive';
+import type { OpenTray as _rippy_v1_OpenTray, OpenTray__Output as _rippy_v1_OpenTray__Output } from '../../rippy/v1/OpenTray';
+import type { CloseTray as _rippy_v1_CloseTray, CloseTray__Output as _rippy_v1_CloseTray__Output } from '../../rippy/v1/CloseTray';
 import type { Long } from '@grpc/proto-loader';
 
 export interface BackendToRipper {
@@ -15,7 +17,9 @@ export interface BackendToRipper {
   'ejectDisc'?: (_rippy_v1_EjectDisc | null);
   'refreshDisc'?: (_rippy_v1_RefreshDisc | null);
   'resetDrive'?: (_rippy_v1_ResetDrive | null);
-  'command'?: "startRip"|"cancelRip"|"ejectDisc"|"refreshDisc"|"resetDrive";
+  'openTray'?: (_rippy_v1_OpenTray | null);
+  'closeTray'?: (_rippy_v1_CloseTray | null);
+  'command'?: "startRip"|"cancelRip"|"ejectDisc"|"refreshDisc"|"resetDrive"|"openTray"|"closeTray";
 }
 
 export interface BackendToRipper__Output {
@@ -26,5 +30,7 @@ export interface BackendToRipper__Output {
   'ejectDisc'?: (_rippy_v1_EjectDisc__Output | null);
   'refreshDisc'?: (_rippy_v1_RefreshDisc__Output | null);
   'resetDrive'?: (_rippy_v1_ResetDrive__Output | null);
-  'command'?: "startRip"|"cancelRip"|"ejectDisc"|"refreshDisc"|"resetDrive";
+  'openTray'?: (_rippy_v1_OpenTray__Output | null);
+  'closeTray'?: (_rippy_v1_CloseTray__Output | null);
+  'command'?: "startRip"|"cancelRip"|"ejectDisc"|"refreshDisc"|"resetDrive"|"openTray"|"closeTray";
 }

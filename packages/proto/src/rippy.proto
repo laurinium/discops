@@ -28,6 +28,8 @@ message BackendToRipper {
     EjectDisc eject_disc = 12;
     RefreshDisc refresh_disc = 13;
     ResetDrive reset_drive = 14;
+    OpenTray open_tray = 15;
+    CloseTray close_tray = 16;
   }
 }
 
@@ -130,3 +132,5 @@ message CancelRip { string reason = 1; }
 message EjectDisc {}
 message RefreshDisc {}
 message ResetDrive {}
+message OpenTray {}
+message CloseTray {}

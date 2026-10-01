@@ -8,7 +8,7 @@ import { probeDrive, readLocalDriveInfo, UdevMonitor, type TrayStatus } from './
 
 type Logger = { info(o: object): void; warn(o: object): void; error(o: object): void };
 
-type BackendCommand = { startRip?: object; cancelRip?: { reason?: string }; ejectDisc?: object; refreshDisc?: object; resetDrive?: object };
+type BackendCommand = { startRip?: object; cancelRip?: { reason?: string }; ejectDisc?: object; openTray?: object; closeTray?: object; refreshDisc?: object; resetDrive?: object };
 
 function failureTypeToState(failureType?: string): JobState {
   if (failureType === 'FAILED_METADATA') return 'failed-metadata';
@@ -163,7 +163,9 @@ export class RipperController {
   private handleCommand(command: BackendCommand): void {
     if (command.startRip) this.startRip();
     if (command.cancelRip) this.abcde.cancel('USER_CANCEL');
-    if (command.ejectDisc) this.eject();
+    if (command.ejectDisc) this.toggleTray();
+    if (command.openTray) this.openTray('command-open-tray');
+    if (command.closeTray) this.closeTray();
     if (command.refreshDisc) void this.refresh('command');
     if (command.resetDrive) this.resetDrive();
   }
@@ -208,23 +210,32 @@ export class RipperController {
     });
   }
 
-  private eject(): void {
+  private toggleTray(): void {
+    if (this.trayStatus === 'open') this.closeTray();
+    else this.openTray('eject');
+  }
+
+  private openTray(source: string): void {
     if (this.abcde.running) this.abcde.cancel('EJECT_REQUEST');
-    const closing = this.trayStatus === 'open';
-    const args = closing ? ['-t', this.config.DRIVE_DEVICE] : [this.config.DRIVE_DEVICE];
-    const child = spawn('eject', args, { stdio: 'ignore' });
+    const child = spawn('eject', [this.config.DRIVE_DEVICE], { stdio: 'ignore' });
     child.on('exit', (code) => {
       if (code === 0) {
-        if (closing) {
-          this.trayStatus = 'closed';
-          this.setState(this.mediaPresent ? this.state : 'idle');
-        } else {
-          this.mediaPresent = false;
-          this.trayStatus = 'open';
-          this.setState('ejected');
-        }
+        this.mediaPresent = false;
+        this.trayStatus = 'open';
+        this.setState('ejected', { progressPercent: 0, currentTrack: 0, currentFile: '', error: '' });
       }
-      setTimeout(() => void this.refresh(closing ? 'close-tray' : 'eject'), 1500).unref();
+      setTimeout(() => void this.refresh(source), 1500).unref();
+    });
+  }
+
+  private closeTray(): void {
+    const child = spawn('eject', ['-t', this.config.DRIVE_DEVICE], { stdio: 'ignore' });
+    child.on('exit', (code) => {
+      if (code === 0) {
+        this.trayStatus = 'closed';
+        this.setState(this.mediaPresent ? this.state : 'idle', { progressPercent: 0, currentTrack: 0, currentFile: '', error: '' });
+      }
+      setTimeout(() => void this.refresh('close-tray'), 1500).unref();
     });
   }
 

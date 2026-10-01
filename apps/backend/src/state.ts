@@ -4,7 +4,7 @@ import type { DriveSnapshot, HistoryJob, JobState, RippedAlbum, RipperCommandReq
 import { RipperCommandSchema } from '@rippy/shared';
 import type { Store } from './store.js';
 
-type Command = { commandId: string; timestampUnixMs: number; startRip?: object; cancelRip?: { reason: string }; ejectDisc?: object; refreshDisc?: object; resetDrive?: object };
+type Command = { commandId: string; timestampUnixMs: number; startRip?: object; cancelRip?: { reason: string }; ejectDisc?: object; openTray?: object; closeTray?: object; refreshDisc?: object; resetDrive?: object };
 type Stream = ServerWritableStream<unknown, Command>;
 
 export class AppState extends EventEmitter {
@@ -70,7 +70,20 @@ export class AppState extends EventEmitter {
     if (req.command === 'startRip') stream.write({ ...base, startRip: {} });
     if (req.command === 'cancelRip') stream.write({ ...base, cancelRip: { reason: 'user-request' } });
     if (req.command === 'ejectDisc') stream.write({ ...base, ejectDisc: {} });
+    if (req.command === 'openTray') stream.write({ ...base, openTray: {} });
+    if (req.command === 'closeTray') stream.write({ ...base, closeTray: {} });
     if (req.command === 'refreshDisc') stream.write({ ...base, refreshDisc: {} });
     if (req.command === 'resetDrive') stream.write({ ...base, resetDrive: {} });
+  }
+
+  broadcastCommand(command: RipperCommandRequest['command'], onlyConnected = true): Array<{ ripperId: string; ok: boolean; error?: string }> {
+    return this.listDrives().filter((drive) => !onlyConnected || drive.connected).map((drive) => {
+      try {
+        this.sendCommand({ ripperId: drive.ripperId, command });
+        return { ripperId: drive.ripperId, ok: true };
+      } catch (err) {
+        return { ripperId: drive.ripperId, ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    });
   }
 }

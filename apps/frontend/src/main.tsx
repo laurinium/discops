@@ -23,6 +23,14 @@ function command(ripperId: string, cmd: string): Promise<void> {
   });
 }
 
+function debugCommand(cmd: string): Promise<unknown> {
+  return fetch(`${apiBase}/api/debug/${cmd}`, { method: 'POST' }).then(async (r) => {
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`debug command failed: ${r.status}`);
+    return body;
+  });
+}
+
 function useAlbumArt(artist?: string, album?: string): string | undefined {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
@@ -158,6 +166,27 @@ function AlbumsPage({ albums }: { albums: RippedAlbum[] }) {
   </div>;
 }
 
+function DebugPage({ drives }: { drives: DriveSnapshot[] }) {
+  const [result, setResult] = useState<string>();
+  const run = (cmd: string, warning?: string) => {
+    if (warning && !window.confirm(warning)) return;
+    setResult('Running…');
+    void debugCommand(cmd).then((body) => setResult(JSON.stringify(body, null, 2))).catch((err: Error) => setResult(err.message));
+  };
+  const ripping = drives.filter((d) => d.state === 'ripping' || d.state === 'encoding' || d.state === 'reading-metadata');
+  return <Card><CardHeader><CardTitle>Debug controls</CardTitle><CardDescription>Broadcast maintenance commands to all connected rippers. Dangerous actions are guarded.</CardDescription></CardHeader><CardContent className="space-y-4">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <Button variant="destructive" onClick={() => run('stopAllJobs', `Stop ${ripping.length || 'all'} active job(s)? This cancels abcde on every connected ripper.`)}><Pause className="h-4 w-4" />Stop all jobs</Button>
+      <Button variant="outline" onClick={() => run('openAllTrays', 'Open all trays? This will cancel any active rip before ejecting.') }><Eject className="h-4 w-4" />Open all trays</Button>
+      <Button variant="outline" onClick={() => run('closeAllTrays')}><Eject className="h-4 w-4 rotate-180" />Close all trays</Button>
+      <Button variant="secondary" onClick={() => run('refreshAll')}><RefreshCw className="h-4 w-4" />Refresh all drives</Button>
+      <Button variant="destructive" onClick={() => run('resetAllDrives', 'Reset every connected optical drive via sg_reset? Use only if multiple drives/controllers are wedged.') }><RotateCcw className="h-4 w-4" />Reset all drives</Button>
+    </div>
+    <div className="rounded-md border bg-muted/20 p-3 text-sm"><div className="mb-2 font-semibold">Connected drives: {drives.filter((d) => d.connected).length} / {drives.length}</div><div className="grid gap-1 md:grid-cols-2 xl:grid-cols-3">{drives.map((d) => <div key={d.ripperId} className="truncate text-muted-foreground">{d.ripperId} · {d.device} · {d.state} · {d.trayStatus ?? 'unknown'}</div>)}</div></div>
+    {result && <pre className="max-h-80 overflow-auto rounded-md border bg-black/30 p-3 text-xs text-muted-foreground">{result}</pre>}
+  </CardContent></Card>;
+}
+
 function History({ history }: { history: HistoryJob[] }) { return <Card><CardHeader><CardTitle>History</CardTitle><CardDescription>Recent rip jobs</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Started</TableHead><TableHead>Drive</TableHead><TableHead>Album</TableHead><TableHead>Status</TableHead><TableHead>Error</TableHead></TableRow></TableHeader><TableBody>{history.map((j) => <TableRow key={j.id}><TableCell>{j.startedAt}</TableCell><TableCell>{j.ripperId}</TableCell><TableCell>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</TableCell><TableCell><Badge variant={j.state === 'completed' ? 'success' : j.state.includes('failed') ? 'destructive' : 'secondary'}>{j.state}</Badge></TableCell><TableCell className="text-red-300">{j.error}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>; }
 
 function App() {
@@ -165,7 +194,7 @@ function App() {
   const [error, setError] = useState<string>();
   useEffect(() => { fetch(`${apiBase}/api/state`).then((r) => r.json()).then(setState).catch((e: Error) => setError(e.message)); const es = new EventSource(`${apiBase}/api/events`); es.onmessage = (ev) => { setState(JSON.parse(ev.data) as ApiState); setError(undefined); }; es.onerror = () => setError('live connection interrupted'); return () => es.close(); }, []);
   const drives = useMemo(() => state.drives, [state.drives]);
-  return <main className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6"><header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><h1 className="text-3xl font-bold tracking-tight md:text-4xl">DiscOps</h1><p className="text-muted-foreground">Multi-drive abcde ripping dashboard</p></div></header>{error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-red-200">{error}</div>}<Tabs defaultValue="dashboard" className="space-y-4"><TabsList><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="albums">Albums</TabsTrigger><TabsTrigger value="logs">Logs</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList><TabsContent value="dashboard" className="space-y-4"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <Card><CardContent className="p-6 text-muted-foreground">No rippers connected yet.</CardContent></Card>}</div><History history={state.history} /></TabsContent><TabsContent value="albums"><AlbumsPage albums={state.albums ?? []} /></TabsContent><TabsContent value="logs"><LogViewer drives={drives} /></TabsContent><TabsContent value="status"><StatusPage /></TabsContent></Tabs></main>;
+  return <main className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6"><header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><h1 className="text-3xl font-bold tracking-tight md:text-4xl">DiscOps</h1><p className="text-muted-foreground">Multi-drive abcde ripping dashboard</p></div></header>{error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-red-200">{error}</div>}<Tabs defaultValue="dashboard" className="space-y-4"><TabsList><TabsTrigger value="dashboard">Dashboard</TabsTrigger><TabsTrigger value="albums">Albums</TabsTrigger><TabsTrigger value="logs">Logs</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger><TabsTrigger value="debug">Debug</TabsTrigger></TabsList><TabsContent value="dashboard" className="space-y-4"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{drives.length ? drives.map((d) => <DriveCard key={d.ripperId} drive={d} />) : <Card><CardContent className="p-6 text-muted-foreground">No rippers connected yet.</CardContent></Card>}</div><History history={state.history} /></TabsContent><TabsContent value="albums"><AlbumsPage albums={state.albums ?? []} /></TabsContent><TabsContent value="logs"><LogViewer drives={drives} /></TabsContent><TabsContent value="status"><StatusPage /></TabsContent><TabsContent value="debug"><DebugPage drives={drives} /></TabsContent></Tabs></main>;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

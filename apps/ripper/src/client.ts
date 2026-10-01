@@ -9,6 +9,8 @@ type BackendCommand = {
   startRip?: object;
   cancelRip?: { reason?: string };
   ejectDisc?: object;
+  openTray?: object;
+  closeTray?: object;
   refreshDisc?: object;
   resetDrive?: object;
 };

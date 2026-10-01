@@ -12,11 +12,13 @@ export interface ProtoGrpcType {
     v1: {
       BackendToRipper: MessageTypeDefinition
       CancelRip: MessageTypeDefinition
+      CloseTray: MessageTypeDefinition
       DiscEvent: MessageTypeDefinition
       DiscEventType: EnumTypeDefinition
       DriveState: MessageTypeDefinition
       EjectDisc: MessageTypeDefinition
       Heartbeat: MessageTypeDefinition
+      OpenTray: MessageTypeDefinition
       RefreshDisc: MessageTypeDefinition
       ResetDrive: MessageTypeDefinition
       RipEvent: MessageTypeDefinition

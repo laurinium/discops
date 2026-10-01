@@ -30,10 +30,23 @@ export function createHttp(state: AppState, corsOrigin: string): express.Express
   app.get('/api/status', async (_req, res, next) => {
     try { res.json(await buildStatus(state)); } catch (err) { next(err); }
   });
+  app.post('/api/debug/:command', (req, res) => {
+    const map: Record<string, 'cancelRip' | 'openTray' | 'closeTray' | 'refreshDisc' | 'resetDrive'> = {
+      stopAllJobs: 'cancelRip',
+      openAllTrays: 'openTray',
+      closeAllTrays: 'closeTray',
+      refreshAll: 'refreshDisc',
+      resetAllDrives: 'resetDrive',
+    };
+    const command = map[req.params.command ?? ''];
+    if (!command) return res.status(404).json({ error: 'unknown debug command' });
+    return res.status(202).json({ ok: true, command, results: state.broadcastCommand(command) });
+  });
+
   app.post('/api/rippers/:ripperId/:command', (req, res, next) => {
     try {
       const { ripperId, command } = req.params;
-      if (!['startRip', 'cancelRip', 'ejectDisc', 'refreshDisc', 'resetDrive'].includes(command ?? '')) {
+      if (!['startRip', 'cancelRip', 'ejectDisc', 'openTray', 'closeTray', 'refreshDisc', 'resetDrive'].includes(command ?? '')) {
         res.status(404).json({ error: 'unknown command' });
         return;
       }

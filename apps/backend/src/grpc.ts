@@ -107,9 +107,12 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const r = msg.ripEvent as Event;
           const type = str(r.type);
           const jobId = str(r.jobId) ?? 'unknown';
-          if (type === 'RIP_STARTED') state.recordJob(defined<HistoryJob>({ id: jobId, ripperId, device: state.listDrives().find((d) => d.ripperId === ripperId)?.device ?? 'unknown', state: 'ripping', startedAt: new Date().toISOString() }));
+          if (type === 'RIP_STARTED') {
+            state.patch(ripperId, { currentJobId: jobId, error: undefined, progressPercent: 0, currentTrack: undefined, currentFile: undefined });
+            state.recordJob(defined<HistoryJob>({ id: jobId, ripperId, device: state.listDrives().find((d) => d.ripperId === ripperId)?.device ?? 'unknown', state: 'ripping', startedAt: new Date().toISOString() }));
+          }
           if (type === 'RIP_PROGRESS') state.patch(ripperId, defined<Partial<DriveSnapshot>>({
-            state: 'ripping', currentTrack: num(r.currentTrack), totalTracks: num(r.totalTracks), progressPercent: num(r.progressPercent), currentFile: str(r.currentFile),
+            state: 'ripping', error: undefined, currentTrack: num(r.currentTrack), totalTracks: num(r.totalTracks), progressPercent: num(r.progressPercent), currentFile: str(r.currentFile),
             artist: str(r.artist), album: str(r.album), releaseDate: str(r.releaseDate), musicBrainzDiscId: str(r.musicBrainzDiscId), musicBrainzReleaseId: str(r.musicBrainzReleaseId),
             discNumber: num(r.discNumber), totalDiscs: num(r.totalDiscs),
           }));

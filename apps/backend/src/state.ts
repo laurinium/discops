@@ -26,10 +26,10 @@ export class AppState extends EventEmitter {
   attach(ripperId: string, stream: Stream): void { this.streams.set(ripperId, stream); this.patch(ripperId, { connected: true }); }
   detach(ripperId: string): void { this.streams.delete(ripperId); this.patch(ripperId, { connected: false }); }
 
-  patch(ripperId: string, patch: Partial<DriveSnapshot>): void {
+  patch(ripperId: string, patch: Partial<{ [K in keyof DriveSnapshot]: DriveSnapshot[K] | undefined }>): void {
     const now = new Date().toISOString();
     const prev = this.drives.get(ripperId) ?? { ripperId, device: patch.device ?? 'unknown', connected: false, state: 'idle', mediaPresent: false, lastSeenAt: now, logs: [] };
-    const next = { ...prev, ...patch, lastSeenAt: now };
+    const next = { ...prev, ...patch, lastSeenAt: now } as DriveSnapshot;
     this.drives.set(ripperId, next);
     this.emit('change');
   }

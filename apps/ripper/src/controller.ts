@@ -106,6 +106,14 @@ export class RipperController {
     const status = probe.mediaStatus;
     this.trayStatus = probe.trayStatus;
     this.log.info({ event: 'drive_refresh', source, status, trayStatus: this.trayStatus, device: this.config.DRIVE_DEVICE });
+    if (this.abcde.running) {
+      // Some drives transiently report NOT READY/absent while cdparanoia owns the
+      // device. Treat polling as observational during a rip; only explicit
+      // user commands should cancel an active abcde process.
+      if (status === 'present') this.mediaPresent = true;
+      this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus }));
+      return;
+    }
     if (status === 'present' && !this.mediaPresent) {
       this.mediaPresent = true;
       this.setState('disc-detected');
@@ -113,7 +121,6 @@ export class RipperController {
       if (this.config.AUTO_RIP) this.startRip();
     } else if (status === 'absent' && this.mediaPresent) {
       this.mediaPresent = false;
-      if (this.abcde.running) this.abcde.cancel();
       this.setState('ejected');
       this.client.send({ discEvent: { type: 'DISC_REMOVED', device: this.config.DRIVE_DEVICE } });
     } else {

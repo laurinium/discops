@@ -91,7 +91,13 @@ export class AbcdeRunner extends EventEmitter {
           log.write(data);
           for (const line of data.toString('utf8').split(/\r?\n/).filter(Boolean)) {
             this.emit('log', { jobId, stream, line });
-            if (nextLineContainsTrackList) {
+            const queuedTracks = parseTracksQueuedCount(line);
+            if (queuedTracks > 0) {
+              expectedTracks = queuedTracks;
+              writeJobMetadata();
+              this.emit('progress', { jobId, totalTracks: expectedTracks, phase: 'METADATA_LOOKUP' });
+              nextLineContainsTrackList = false;
+            } else if (nextLineContainsTrackList) {
               const parsedExpectedTracks = parseAbcdeTrackListCount(line);
               if (parsedExpectedTracks > 0) {
                 expectedTracks = parsedExpectedTracks;
@@ -100,7 +106,7 @@ export class AbcdeRunner extends EventEmitter {
               }
               nextLineContainsTrackList = false;
             }
-            if (/Grabbing entire CD - tracks:/i.test(line)) nextLineContainsTrackList = true;
+            if (/Grabbing entire CD/i.test(line)) nextLineContainsTrackList = true;
             const progress = parseProgress(line);
             if (progress) {
               if (progress.totalTracks) expectedTracks = progress.totalTracks;
@@ -182,6 +188,11 @@ export class AbcdeRunner extends EventEmitter {
     if (existsSync(`${paths.workDir}/RUNNING`)) rmSync(`${paths.workDir}/RUNNING`, { force: true });
     writeFileSync(`${paths.workDir}/${marker}`, [new Date().toISOString(), detail].filter(Boolean).join('\n'));
   }
+}
+
+export function parseTracksQueuedCount(line: string): number {
+  if (!/Tracks queued:/i.test(line)) return 0;
+  return parseAbcdeTrackListCount(line);
 }
 
 export function parseAbcdeTrackListCount(line: string): number {

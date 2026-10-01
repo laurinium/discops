@@ -38,6 +38,12 @@ function metadataFromLog(line: string, previous?: DriveSnapshot): Partial<DriveS
     patch.album = metadata[2].trim();
     patch.state = previous?.state === 'ripping' ? 'ripping' : 'reading-metadata';
   }
+  const queued = clean.match(/Tracks queued:\s+(.+)$/i);
+  if (queued?.[1]) {
+    const count = (queued[1].match(/\b\d{2,3}\b/g) ?? []).length;
+    if (count > 0) patch.totalTracks = count;
+  }
+  if (/Grabbing track\s+(\d+)/i.test(clean) || /outputting to .*track\d+\.wav/i.test(clean)) patch.state = 'ripping';
   const track = clean.match(/^\s*(\d{1,3}):\s+(.+?)\s*$/);
   if (track?.[1] && track?.[2]) {
     const number = Number(track[1]);
@@ -83,7 +89,10 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
         if ('heartbeat' in msg) state.patch(ripperId, { connected: true });
         if ('driveState' in msg && msg.driveState && typeof msg.driveState === 'object') {
           const d = msg.driveState as Event;
-          const nextState = (str(d.state) ?? 'idle') as JobState;
+          const requestedState = (str(d.state) ?? 'idle') as JobState;
+          const prevDrive = state.getDrive(ripperId);
+          const activeJob = Boolean(prevDrive?.currentJobId || str(d.jobId));
+          const nextState = activeJob && prevDrive?.state === 'ripping' && requestedState === 'reading-metadata' ? 'ripping' : requestedState;
           state.patch(ripperId, defined<Partial<DriveSnapshot>>({
             device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: nextState,
             trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), currentJobId: str(d.jobId), artist: str(d.artist), album: str(d.album),

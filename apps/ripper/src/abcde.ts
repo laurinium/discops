@@ -124,10 +124,13 @@ export class AbcdeRunner extends EventEmitter {
             this.fail(jobId, paths, 'FAILED_METADATA', err instanceof Error ? err.message : String(err), code, signal);
             return;
           }
+          if (code === null && signal) {
+            this.fail(jobId, paths, 'FAILED_INTERRUPTED', `abcde terminated by signal ${signal}`, code, signal);
+            return;
+          }
           const validation = validateCompletedRip(paths, expectedTracks, code);
           if (!validation.ok) {
-            const processError = code === null && signal ? `abcde terminated by signal ${signal}` : validation.error;
-            this.fail(jobId, paths, validation.failureType ?? 'UNKNOWN_ERROR', processError ?? `abcde exited code=${code} signal=${signal ?? ''}`, code, signal);
+            this.fail(jobId, paths, validation.failureType ?? 'UNKNOWN_ERROR', validation.error ?? `abcde exited code=${code} signal=${signal ?? ''}`, code, signal);
             return;
           }
           try {

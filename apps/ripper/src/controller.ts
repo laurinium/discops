@@ -128,7 +128,7 @@ export class RipperController {
     if (metadata?.[1] && metadata?.[2]) {
       this.artist = metadata[1].trim();
       this.album = metadata[2].trim();
-      this.setState('reading-metadata');
+      if (this.state !== 'ripping' && this.state !== 'encoding') this.setState('reading-metadata');
       return;
     }
 
@@ -139,7 +139,7 @@ export class RipperController {
       if (!Number.isNaN(number) && title) {
         const withoutDuplicate = this.tracks.filter((t) => t.number !== number);
         this.tracks = [...withoutDuplicate, { number, title }].sort((a, b) => a.number - b.number);
-        this.setState('reading-metadata', { totalTracks: this.tracks.length });
+        this.setState(this.state === 'ripping' || this.state === 'encoding' ? this.state : 'reading-metadata', { totalTracks: this.tracks.length });
       }
     }
   }

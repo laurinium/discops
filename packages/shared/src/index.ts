@@ -69,6 +69,7 @@ export interface DriveSnapshot {
   totalTracks?: number;
   progressPercent?: number;
   currentFile?: string;
+  duplicateSuppressed?: boolean;
   lastSeenAt: string;
   logs: string[];
   error?: string;

@@ -178,6 +178,7 @@ export const openApiDocument = {
           mediaPresent: { type: 'boolean' },
           trayStatus: { type: 'string', enum: ['open', 'closed', 'unknown'] },
           discId: { type: 'string' },
+          duplicateSuppressed: { type: 'boolean' },
           currentJobId: { type: 'string', format: 'uuid' },
           artist: { type: 'string' },
           album: { type: 'string' },

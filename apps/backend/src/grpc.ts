@@ -27,6 +27,27 @@ function tracks(v: unknown): TrackMetadata[] | undefined {
 function defined<T extends object>(value: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
+
+export function ripProgressPatch(r: Event): Partial<DriveSnapshot> {
+  const phase = str(r.phase);
+  const state: JobState = phase === 'ENCODING' ? 'encoding' : 'ripping';
+  return defined<Partial<DriveSnapshot>>({
+    state,
+    error: undefined,
+    currentTrack: num(r.currentTrack),
+    totalTracks: num(r.totalTracks),
+    progressPercent: num(r.progressPercent),
+    currentFile: str(r.currentFile),
+    artist: str(r.artist),
+    album: str(r.album),
+    releaseDate: str(r.releaseDate),
+    musicBrainzDiscId: str(r.musicBrainzDiscId),
+    musicBrainzReleaseId: str(r.musicBrainzReleaseId),
+    discNumber: num(r.discNumber),
+    totalDiscs: num(r.totalDiscs),
+    duplicateSuppressed: typeof r.duplicateSuppressed === 'boolean' ? r.duplicateSuppressed : undefined,
+  });
+}
 function metadataFromLog(line: string, previous?: DriveSnapshot): Partial<DriveSnapshot> | undefined {
   const clean = line.replace(/^\[(stdout|stderr)]\s*/, '');
   const selected = clean.match(/Selected:\s+#\d+\s+\((.+?)\s+\/\s+(.+?)\)\s*$/i);
@@ -95,17 +116,17 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const nextState = activeJob && prevDrive?.state === 'ripping' && requestedState === 'reading-metadata' ? 'ripping' : requestedState;
           state.patch(ripperId, defined<Partial<DriveSnapshot>>({
             device: str(d.device) ?? 'unknown', mediaPresent: Boolean(d.mediaPresent), state: nextState,
-            trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), currentJobId: str(d.jobId), artist: str(d.artist), album: str(d.album),
+            trayStatus: str(d.trayStatus), tracks: tracks(d.tracks), discId: str(d.discId), duplicateSuppressed: typeof d.duplicateSuppressed === 'boolean' ? d.duplicateSuppressed : undefined, currentJobId: str(d.jobId), artist: str(d.artist), album: str(d.album),
             releaseDate: str(d.releaseDate), musicBrainzDiscId: str(d.musicBrainzDiscId), musicBrainzReleaseId: str(d.musicBrainzReleaseId),
             discNumber: num(d.discNumber), totalDiscs: num(d.totalDiscs), currentTrack: num(d.currentTrack), totalTracks: num(d.totalTracks),
             progressPercent: num(d.progressPercent), currentFile: str(d.currentFile), error: str(d.error),
           }));
-          if (['idle', 'disc-detected', 'ejected'].includes(nextState)) state.patch(ripperId, { currentJobId: undefined, currentTrack: undefined, currentFile: undefined, progressPercent: 0, error: undefined });
+          if (['idle', 'disc-detected', 'ejected'].includes(nextState)) state.patch(ripperId, { currentJobId: undefined, currentTrack: undefined, currentFile: undefined, progressPercent: 0, error: undefined, duplicateSuppressed: undefined });
         }
         if ('discEvent' in msg && msg.discEvent && typeof msg.discEvent === 'object') {
           const d = msg.discEvent as Event;
           const type = str(d.type);
-          state.patch(ripperId, { mediaPresent: type !== 'DISC_REMOVED', state: type === 'UNSUPPORTED_MEDIA' ? 'unsupported' : type === 'DISC_REMOVED' ? 'ejected' : 'disc-detected', error: str(d.reason), currentJobId: undefined, currentTrack: undefined, currentFile: undefined, progressPercent: 0 });
+          state.patch(ripperId, { mediaPresent: type !== 'DISC_REMOVED', state: type === 'UNSUPPORTED_MEDIA' ? 'unsupported' : type === 'DISC_REMOVED' ? 'ejected' : 'disc-detected', error: str(d.reason), currentJobId: undefined, currentTrack: undefined, currentFile: undefined, progressPercent: 0, duplicateSuppressed: undefined });
         }
         if ('ripLog' in msg && msg.ripLog && typeof msg.ripLog === 'object') {
           const l = msg.ripLog as Event;
@@ -119,17 +140,13 @@ export function startGrpc(state: AppState, port: number): grpc.Server {
           const type = str(r.type);
           const jobId = str(r.jobId) ?? 'unknown';
           if (type === 'RIP_STARTED') {
-            state.patch(ripperId, { currentJobId: jobId, artist: undefined, album: undefined, tracks: [], error: undefined, progressPercent: 0, currentTrack: undefined, totalTracks: undefined, currentFile: undefined });
+            state.patch(ripperId, { currentJobId: jobId, artist: undefined, album: undefined, tracks: [], error: undefined, progressPercent: 0, currentTrack: 0, currentFile: undefined, duplicateSuppressed: false });
             state.recordJob(defined<HistoryJob>({ id: jobId, ripperId, device: state.listDrives().find((d) => d.ripperId === ripperId)?.device ?? 'unknown', state: 'ripping', startedAt: new Date().toISOString() }));
           }
-          if (type === 'RIP_PROGRESS') state.patch(ripperId, {
-            state: 'ripping', error: undefined, currentTrack: num(r.currentTrack), totalTracks: num(r.totalTracks), progressPercent: num(r.progressPercent), currentFile: str(r.currentFile),
-            artist: str(r.artist), album: str(r.album), releaseDate: str(r.releaseDate), musicBrainzDiscId: str(r.musicBrainzDiscId), musicBrainzReleaseId: str(r.musicBrainzReleaseId),
-            discNumber: num(r.discNumber), totalDiscs: num(r.totalDiscs),
-          });
+          if (type === 'RIP_PROGRESS') state.patch(ripperId, ripProgressPatch(r));
           if (type === 'RIP_COMPLETED') { state.patch(ripperId, { state: 'completed', progressPercent: 100, error: undefined, currentJobId: undefined }); state.finishJob(jobId, 'completed'); state.completeRippedAlbum(jobId, ripperId); }
-          if (type === 'RIP_FAILED') { state.patch(ripperId, { state: 'failed', error: str(r.error), currentJobId: undefined }); state.finishJob(jobId, 'failed', str(r.error)); }
-          if (type === 'RIP_CANCELLED') { state.patch(ripperId, { state: 'cancelled', error: str(r.error), currentJobId: undefined }); state.finishJob(jobId, 'cancelled', str(r.error)); }
+          if (type === 'RIP_FAILED') { state.patch(ripperId, { state: 'failed', error: str(r.error), currentJobId: undefined, duplicateSuppressed: false }); state.finishJob(jobId, 'failed', str(r.error)); }
+          if (type === 'RIP_CANCELLED') { state.patch(ripperId, { state: 'cancelled', error: str(r.error), currentJobId: undefined, duplicateSuppressed: false }); state.finishJob(jobId, 'cancelled', str(r.error)); }
         }
       });
       stream.on('error', (err) => logger.warn({ ripperId, err, event: 'ripper_stream_error' }));

@@ -3,7 +3,7 @@ import type { RipperConfig } from '@rippy/config';
 import type { JobState, TrackMetadata } from '@rippy/shared';
 import { AbcdeRunner, type CancelReason } from './abcde.js';
 import { BackendClient, driveState } from './client.js';
-import { markInterruptedJobs } from './armAudio.js';
+import { markInterruptedJobs, readTrackExpectation } from './armAudio.js';
 import { probeDrive, readLocalDriveInfo, UdevMonitor, type TrayStatus } from './drive.js';
 
 type Logger = { info(o: object): void; warn(o: object): void; error(o: object): void };
@@ -32,6 +32,11 @@ export class RipperController {
   private album: string | undefined;
   private tracks: TrackMetadata[] = [];
   private activeJobId: string | undefined;
+  private discId: string | undefined;
+  private lastCompletedDiscId: string | undefined;
+  private duplicateSuppressed = false;
+  private duplicateSuppressionMessage: string | undefined;
+  private duplicateEjectAttempts = 0;
 
   get running(): boolean { return this.abcde.running; }
 
@@ -65,12 +70,15 @@ export class RipperController {
   private wireAbcde(): void {
     this.abcde.on('started', ({ jobId, expectedTracks, discId, workDir }: { jobId: string; expectedTracks: number; discId?: string; workDir: string }) => {
       this.activeJobId = jobId;
+      this.discId = discId;
+      this.duplicateSuppressed = false;
+      this.duplicateSuppressionMessage = undefined;
+      this.duplicateEjectAttempts = 0;
       this.artist = undefined;
       this.album = undefined;
       this.tracks = [];
       this.setState('reading-metadata', {
         totalTracks: expectedTracks,
-        discId,
         currentTrack: 0,
         progressPercent: 0,
         currentFile: '',
@@ -88,7 +96,11 @@ export class RipperController {
       this.client.send({ ripEvent: { type: 'RIP_PROGRESS', ...p } });
     });
     this.abcde.on('completed', ({ jobId, expectedTracks, completedTracks }: { jobId: string; expectedTracks: number; completedTracks: number }) => {
-      this.log.info({ event: 'rip_completed', jobId, expectedTracks, completedTracks, device: this.config.DRIVE_DEVICE });
+      this.log.info({ event: 'rip_completed', jobId, expectedTracks, completedTracks, discId: this.discId, device: this.config.DRIVE_DEVICE });
+      this.lastCompletedDiscId = this.discId;
+      this.duplicateSuppressed = false;
+      this.duplicateSuppressionMessage = undefined;
+      this.duplicateEjectAttempts = 0;
       this.setState('completed', { progressPercent: 100, totalTracks: expectedTracks });
       this.client.send({ ripEvent: { type: 'RIP_COMPLETED', jobId } });
       this.activeJobId = undefined;
@@ -97,6 +109,9 @@ export class RipperController {
     this.abcde.on('failed', ({ jobId, error, failureType }: { jobId: string; error: string; failureType?: string }) => {
       this.log.error({ event: 'rip_failed', jobId, failureType, error, device: this.config.DRIVE_DEVICE });
       const message = failureType ? `${failureType}: ${error}` : error;
+      this.duplicateSuppressed = false;
+      this.duplicateSuppressionMessage = undefined;
+      this.duplicateEjectAttempts = 0;
       this.setState(failureTypeToState(failureType), { error: message });
       this.client.send({ ripEvent: { type: 'RIP_FAILED', jobId, error: message } });
       this.activeJobId = undefined;
@@ -104,6 +119,9 @@ export class RipperController {
     });
     this.abcde.on('cancelled', ({ jobId, reason }: { jobId: string; reason: CancelReason }) => {
       const message = `Cancelled: ${reason}`;
+      this.duplicateSuppressed = false;
+      this.duplicateSuppressionMessage = undefined;
+      this.duplicateEjectAttempts = 0;
       this.setState('cancelled', { error: message });
       this.client.send({ ripEvent: { type: 'RIP_CANCELLED', jobId, error: message } });
       this.activeJobId = undefined;
@@ -120,16 +138,49 @@ export class RipperController {
       // device. Treat polling as observational during a rip; only explicit
       // user commands should cancel an active abcde process.
       if (status === 'present') this.mediaPresent = true;
-      this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus }));
+      this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, { trayStatus: this.trayStatus, duplicateSuppressed: this.duplicateSuppressed }));
+      return;
+    }
+    if (this.duplicateSuppressed) {
+      if (status === 'present') {
+        this.mediaPresent = true;
+        this.setState('completed', { progressPercent: 100, error: this.duplicateSuppressionMessage });
+        this.reopenTrayForDuplicate();
+        return;
+      }
+      this.mediaPresent = false;
+      this.setState('ejected', { progressPercent: 100, currentTrack: 0, currentFile: '', error: this.duplicateSuppressionMessage });
       return;
     }
     if (status === 'present' && !this.mediaPresent) {
       this.mediaPresent = true;
-      this.setState('disc-detected');
-      this.client.send({ discEvent: { type: 'DISC_INSERTED', device: this.config.DRIVE_DEVICE } });
-      if (this.config.AUTO_RIP) this.startRip();
+      this.duplicateSuppressed = false;
+      const expectation = readTrackExpectation(this.config.DRIVE_DEVICE);
+      this.discId = expectation.discId;
+      this.setState('disc-detected', { totalTracks: expectation.expectedTracks || undefined });
+      this.client.send({ discEvent: { type: 'DISC_INSERTED', device: this.config.DRIVE_DEVICE, ...(expectation.discId ? { discId: expectation.discId } : {}) } });
+      if (this.config.AUTO_RIP) {
+        if (this.lastCompletedDiscId && expectation.discId && expectation.discId === this.lastCompletedDiscId) {
+          this.duplicateSuppressed = true;
+          this.duplicateSuppressionMessage = `Duplicate disc detected on ${this.config.DRIVE_DEVICE}; disc ${expectation.discId} was already ripped successfully on this drive. Suppressing auto-rip and ejecting tray.`;
+          this.duplicateEjectAttempts = 0;
+          this.log.warn({ event: 'auto_rip_suppressed_same_disc', device: this.config.DRIVE_DEVICE, discId: expectation.discId });
+          this.client.send({ ripLog: { jobId: this.activeJobId ?? 'duplicate-suppressed', stream: 'system', line: this.duplicateSuppressionMessage } });
+          this.setState('completed', { progressPercent: 100, totalTracks: expectation.expectedTracks || undefined, error: this.duplicateSuppressionMessage });
+          this.reopenTrayForDuplicate();
+          return;
+        }
+        if (this.lastCompletedDiscId && expectation.discId && expectation.discId !== this.lastCompletedDiscId) this.lastCompletedDiscId = undefined;
+        this.duplicateSuppressed = false;
+        this.duplicateSuppressionMessage = undefined;
+        this.duplicateEjectAttempts = 0;
+        this.startRip();
+      }
     } else if (status === 'absent' && this.mediaPresent) {
       this.mediaPresent = false;
+      this.duplicateSuppressed = false;
+      this.duplicateSuppressionMessage = undefined;
+      this.duplicateEjectAttempts = 0;
       this.setState('ejected');
       this.client.send({ discEvent: { type: 'DISC_REMOVED', device: this.config.DRIVE_DEVICE } });
     } else {
@@ -161,7 +212,12 @@ export class RipperController {
   }
 
   private handleCommand(command: BackendCommand): void {
-    if (command.startRip) this.startRip();
+    if (command.startRip) {
+      this.duplicateSuppressed = false;
+      this.duplicateSuppressionMessage = undefined;
+      this.duplicateEjectAttempts = 0;
+      this.startRip(true);
+    }
     if (command.cancelRip) this.abcde.cancel('USER_CANCEL');
     if (command.ejectDisc) this.toggleTray();
     if (command.openTray) this.openTray('command-open-tray');
@@ -170,9 +226,22 @@ export class RipperController {
     if (command.resetDrive) this.resetDrive();
   }
 
-  private startRip(): void {
+  private startRip(force = false): void {
     if (this.abcde.running) return;
     if (!this.mediaPresent) return;
+    if (!force && this.lastCompletedDiscId && this.discId && this.discId === this.lastCompletedDiscId) {
+      this.duplicateSuppressed = true;
+      this.duplicateSuppressionMessage = `Duplicate disc detected on ${this.config.DRIVE_DEVICE}; disc ${this.discId} was already ripped successfully on this drive. Suppressing auto-rip and ejecting tray.`;
+      this.duplicateEjectAttempts = 0;
+      this.log.warn({ event: 'start_rip_suppressed_same_disc', device: this.config.DRIVE_DEVICE, discId: this.discId });
+      this.client.send({ ripLog: { jobId: this.activeJobId ?? 'duplicate-suppressed', stream: 'system', line: this.duplicateSuppressionMessage } });
+      this.setState('completed', { progressPercent: 100, error: this.duplicateSuppressionMessage });
+      this.reopenTrayForDuplicate();
+      return;
+    }
+    this.duplicateSuppressed = false;
+    this.duplicateSuppressionMessage = undefined;
+    this.duplicateEjectAttempts = 0;
     this.abcde.start({
       device: this.config.DRIVE_DEVICE,
       outputDir: this.config.OUTPUT_DIR,
@@ -215,14 +284,33 @@ export class RipperController {
     else this.openTray('eject');
   }
 
-  private openTray(source: string): void {
+  private reopenTrayForDuplicate(): void {
+    if (this.duplicateEjectAttempts >= 3) return;
+    this.duplicateEjectAttempts += 1;
+    this.openTray(`duplicate-suppressed-${this.duplicateEjectAttempts}`, true);
+  }
+
+  private openTray(source: string, preserveDuplicateStatus = false): void {
     if (this.abcde.running) this.abcde.cancel('EJECT_REQUEST');
     const child = spawn('eject', [this.config.DRIVE_DEVICE], { stdio: 'ignore' });
     child.on('exit', (code) => {
       if (code === 0) {
         this.mediaPresent = false;
         this.trayStatus = 'open';
-        this.setState('ejected', { progressPercent: 0, currentTrack: 0, currentFile: '', error: '' });
+        if (!preserveDuplicateStatus) {
+          this.duplicateSuppressed = false;
+          this.duplicateSuppressionMessage = undefined;
+          this.duplicateEjectAttempts = 0;
+        }
+        this.setState('ejected', {
+          progressPercent: preserveDuplicateStatus ? 100 : 0,
+          currentTrack: 0,
+          currentFile: '',
+          ...(preserveDuplicateStatus ? { error: this.duplicateSuppressionMessage } : { error: '' }),
+        });
+      } else if (preserveDuplicateStatus) {
+        this.log.warn({ event: 'duplicate_eject_failed', device: this.config.DRIVE_DEVICE, exitCode: code, discId: this.discId, attempt: this.duplicateEjectAttempts });
+        this.client.send({ ripLog: { jobId: this.activeJobId ?? 'duplicate-suppressed', stream: 'system', line: `Duplicate disc eject attempt ${this.duplicateEjectAttempts} failed with exit code ${code}; will re-check tray state.` } });
       }
       setTimeout(() => void this.refresh(source), 1500).unref();
     });
@@ -244,6 +332,8 @@ export class RipperController {
     this.client.send(driveState(this.config.DRIVE_DEVICE, this.state, this.mediaPresent, {
       trayStatus: this.trayStatus,
       jobId: this.activeJobId,
+      discId: this.discId,
+      duplicateSuppressed: this.duplicateSuppressed,
       artist: this.artist,
       album: this.album,
       tracks: this.tracks,

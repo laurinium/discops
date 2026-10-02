@@ -14,6 +14,8 @@ import './style.css';
 
 interface ApiState { drives: DriveSnapshot[]; history: HistoryJob[]; albums: RippedAlbum[] }
 interface StatusData { time: string; host: Record<string, unknown>; musicBrainz: Record<string, unknown>; drives: Array<Record<string, unknown>> }
+interface AlbumGroup { key: string; latest: RippedAlbum; items: RippedAlbum[]; drives: string[] }
+interface HistoryGroup { key: string; latest: HistoryJob; items: HistoryJob[] }
 const empty: ApiState = { drives: [], history: [], albums: [] };
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
@@ -51,15 +53,76 @@ function useAlbumArt(artist?: string, album?: string): string | undefined {
 
 function statusText(drive: DriveSnapshot): string {
   if (!drive.connected) return 'Offline';
-  if (drive.state === 'ripping' && drive.currentTrack) return `Ripping track ${drive.currentTrack}`;
+  if (drive.duplicateSuppressed) return 'Auto-rip suppressed';
+  if ((drive.state === 'ripping' || drive.state === 'encoding') && drive.currentTrack) {
+    return `${drive.state === 'encoding' ? 'Encoding' : 'Ripping'} track ${drive.currentTrack}${drive.totalTracks ? ` of ${drive.totalTracks}` : ''}`;
+  }
   if (drive.state === 'reading-metadata') return 'Reading metadata';
+  if (drive.state === 'encoding') return 'Encoding';
   if (drive.trayStatus === 'open') return 'Tray open';
   if (!drive.mediaPresent) return 'No disc';
   return drive.state;
 }
 
+function progressValue(drive: DriveSnapshot): number {
+  if (typeof drive.progressPercent === 'number') return Math.max(0, Math.min(100, Math.round(drive.progressPercent)));
+  if (drive.state === 'completed') return 100;
+  if (drive.currentTrack && drive.totalTracks && drive.totalTracks > 0) {
+    return Math.max(0, Math.min(99, Math.round((drive.currentTrack / drive.totalTracks) * 100)));
+  }
+  return 0;
+}
+
+function driveHardwareLabel(drive: DriveSnapshot): string {
+  return [drive.driveInfo?.vendor, drive.driveInfo?.model].filter(Boolean).join(' ') || 'Unknown drive';
+}
+
+function shortDiscId(discId?: string): string | undefined {
+  return discId ? discId.slice(0, 8) : undefined;
+}
+
+function albumGroupKey(album: RippedAlbum): string {
+  return [album.ripperId, album.artist ?? '', album.album ?? '', album.discNumber ?? '', album.totalDiscs ?? '', album.releaseDate ?? '', album.tracks.map((track) => `${track.number}:${track.title}`).join('|')].join('::');
+}
+
+function groupAlbums(albums: RippedAlbum[]): AlbumGroup[] {
+  const grouped = new Map<string, AlbumGroup>();
+  for (const album of albums) {
+    const key = albumGroupKey(album);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.items.push(album);
+      if (album.completedAt > existing.latest.completedAt) existing.latest = album;
+      if (!existing.drives.includes(album.ripperId)) existing.drives.push(album.ripperId);
+    } else {
+      grouped.set(key, { key, latest: album, items: [album], drives: [album.ripperId] });
+    }
+  }
+  return [...grouped.values()].sort((a, b) => b.latest.completedAt.localeCompare(a.latest.completedAt));
+}
+
+function historyGroupKey(job: HistoryJob): string {
+  if (job.state !== 'completed') return `job::${job.id}`;
+  return [job.ripperId, job.device, job.state, job.artist ?? '', job.album ?? ''].join('::');
+}
+
+function groupHistory(history: HistoryJob[]): HistoryGroup[] {
+  const grouped = new Map<string, HistoryGroup>();
+  for (const job of history) {
+    const key = historyGroupKey(job);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.items.push(job);
+      if (job.startedAt > existing.latest.startedAt) existing.latest = job;
+    } else {
+      grouped.set(key, { key, latest: job, items: [job] });
+    }
+  }
+  return [...grouped.values()].sort((a, b) => b.latest.startedAt.localeCompare(a.latest.startedAt));
+}
+
 function DriveCard({ drive }: { drive: DriveSnapshot }) {
-  const pct = Math.round(drive.progressPercent ?? 0);
+  const pct = progressValue(drive);
   const tracks = drive.tracks ?? [];
   const active = drive.state === 'ripping' || drive.state === 'reading-metadata' || drive.state === 'encoding';
   const failed = drive.state.startsWith('failed') || drive.state === 'failed';
@@ -69,6 +132,7 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2"><CardTitle className="truncate text-sm">{drive.ripperId}</CardTitle><Badge variant={drive.connected ? 'success' : 'destructive'}>{drive.connected ? 'on' : 'off'}</Badge></div>
           <div className="truncate text-[11px] text-muted-foreground">{drive.device}{drive.driveInfo?.sgDevice ? ` · ${drive.driveInfo.sgDevice}` : ''}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{driveHardwareLabel(drive)}</div>
         </div>
         <DriveDetailsDialog drive={drive} />
       </div>
@@ -83,7 +147,9 @@ function DriveCard({ drive }: { drive: DriveSnapshot }) {
         <Info label="State" value={drive.state} /><Info label="Tray" value={drive.trayStatus ?? 'unknown'} />
         {drive.currentTrack && <Info label="Track" value={`${drive.currentTrack}/${drive.totalTracks ?? (tracks.length || '?')}`} />}
         {drive.currentJobId && <Info label="Job" value={drive.currentJobId.slice(0, 8)} title={drive.currentJobId} />}
+        {drive.discId && <Info label="Disc ID" value={shortDiscId(drive.discId) ?? drive.discId} title={drive.discId} />}
       </div>
+      {drive.duplicateSuppressed && <div className="line-clamp-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-1.5 text-[11px] text-amber-100">This disc was already ripped on this drive. Auto-rip was suppressed; use Start to rerip intentionally.</div>}
       {drive.error && <div className="line-clamp-2 rounded-md border border-destructive/40 bg-destructive/10 p-1.5 text-[11px] text-red-200"><AlertTriangle className="mr-1 inline h-3 w-3" />{drive.error}</div>}
       <div className="flex items-center gap-2"><Progress value={pct} className="h-1.5" /><span className="w-8 text-right text-[11px] text-muted-foreground">{pct}%</span></div>
       <div className="flex flex-wrap gap-1.5">
@@ -110,8 +176,21 @@ function DriveDetailsDialog({ drive }: { drive: DriveSnapshot }) {
       <div className="space-y-4">
         <div className="flex gap-3">
           <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted text-muted-foreground">{art ? <img src={art} alt="Album cover" className="h-full w-full object-cover" /> : <Disc3 className="h-8 w-8" />}</div>
-          <div className="grid flex-1 grid-cols-[6rem_1fr] gap-1 text-sm"><Info label="State" value={drive.state} /><Info label="Media" value={drive.mediaPresent ? 'present' : 'none'} /><Info label="Tray" value={drive.trayStatus ?? 'unknown'} />{drive.currentJobId && <Info label="Job" value={drive.currentJobId} />}{drive.currentFile && <Info label="File" value={drive.currentFile} />}</div>
+          <div className="grid flex-1 grid-cols-[6rem_1fr] gap-1 text-sm">
+            <Info label="State" value={drive.state} />
+            <Info label="Media" value={drive.mediaPresent ? 'present' : 'none'} />
+            <Info label="Tray" value={drive.trayStatus ?? 'unknown'} />
+            <Info label="Drive" value={driveHardwareLabel(drive)} />
+            <Info label="Device" value={drive.device} />
+            <Info label="SG" value={drive.driveInfo?.sgDevice ?? 'n/a'} />
+            {drive.driveInfo?.revision && <Info label="Revision" value={drive.driveInfo.revision} />}
+            {drive.driveInfo?.serial && <Info label="Serial" value={drive.driveInfo.serial} />}
+            {drive.discId && <Info label="Disc ID" value={drive.discId} />}
+            {drive.currentJobId && <Info label="Job" value={drive.currentJobId} />}
+            {drive.currentFile && <Info label="File" value={drive.currentFile} />}
+          </div>
         </div>
+        {drive.duplicateSuppressed && <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-amber-100">This disc ID matches the last successfully ripped disc on this drive, so auto-rip was suppressed. Use Start only if you intentionally want another copy.</div>}
         {drive.error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-red-200"><AlertTriangle className="mr-1 inline h-4 w-4" />{drive.error}</div>}
         <div className="rounded-md border bg-muted/20 p-2"><div className="mb-2 text-xs font-semibold text-muted-foreground">Tracks ({tracks.length})</div>{tracks.length ? tracks.map((track) => <div key={track.number} className={`grid grid-cols-[2.5rem_1fr] rounded px-2 py-1 text-sm ${track.number === drive.currentTrack ? 'bg-emerald-500/20 text-emerald-100' : ''}`}><span className="text-muted-foreground">{String(track.number).padStart(2, '0')}</span><span>{track.title}</span></div>) : <div className="text-sm text-muted-foreground">No tracks captured yet.</div>}</div>
         <pre className="max-h-72 overflow-auto rounded-md border bg-black/30 p-3 font-mono text-xs text-muted-foreground">{drive.logs.slice(-120).join('\n')}</pre>
@@ -147,22 +226,27 @@ function JsonCard({ title, data, icon }: { title: string; data: Record<string, u
 
 function AlbumsPage({ albums }: { albums: RippedAlbum[] }) {
   if (albums.length === 0) return <Card><CardHeader><CardTitle>Ripped albums</CardTitle><CardDescription>No successful rips recorded yet.</CardDescription></CardHeader></Card>;
+  const groups = groupAlbums(albums);
   return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-    {albums.map((album) => <Card key={album.jobId}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0"><CardTitle className="line-clamp-2 text-lg">{album.album ?? 'Unknown album'}</CardTitle><CardDescription>{album.artist ?? 'Unknown artist'}</CardDescription></div>
-          <Badge variant="success">ripped</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs"><Info label="Drive" value={`${album.ripperId} · ${album.device}`} /><Info label="Completed" value={album.completedAt} />{album.discNumber && <Info label="Disc" value={`${album.discNumber}${album.totalDiscs ? ` / ${album.totalDiscs}` : ''}`} />}{album.releaseDate && <Info label="Released" value={album.releaseDate} />}{album.musicBrainzReleaseId && <Info label="MB release" value={album.musicBrainzReleaseId.slice(0, 8)} title={album.musicBrainzReleaseId} />}</div>
-        <div className="max-h-72 overflow-auto rounded-md border bg-muted/20 p-2">
-          <div className="mb-2 text-xs font-semibold text-muted-foreground">{album.tracks.length} tracks</div>
-          {album.tracks.length ? album.tracks.map((track) => <div key={`${album.jobId}-${track.number}`} className="grid grid-cols-[2.5rem_1fr] rounded px-2 py-1 text-sm"><span className="text-muted-foreground">{String(track.number).padStart(2, '0')}</span><span className="truncate">{track.title}</span></div>) : <div className="text-sm text-muted-foreground">Track list was not captured for this rip.</div>}
-        </div>
-      </CardContent>
-    </Card>)}
+    {groups.map((group) => {
+      const album = group.latest;
+      return <Card key={group.key}>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0"><CardTitle className="line-clamp-2 text-lg">{album.album ?? 'Unknown album'}</CardTitle><CardDescription>{album.artist ?? 'Unknown artist'}</CardDescription></div>
+            <div className="flex gap-2">{group.items.length > 1 && <Badge variant="secondary">{group.items.length} rips</Badge>}<Badge variant="success">ripped</Badge></div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs"><Info label="Drive" value={`${album.ripperId} · ${album.device}`} /><Info label="Latest" value={album.completedAt} />{album.discNumber && <Info label="Disc" value={`${album.discNumber}${album.totalDiscs ? ` / ${album.totalDiscs}` : ''}`} />}{album.releaseDate && <Info label="Released" value={album.releaseDate} />}{album.musicBrainzReleaseId && <Info label="MB release" value={album.musicBrainzReleaseId.slice(0, 8)} title={album.musicBrainzReleaseId} />}{group.items.length > 1 && <Info label="Attempts" value={String(group.items.length)} />}</div>
+          {group.items.length > 1 && <div className="rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground">Grouped rerips on {group.drives.join(', ')}. Latest completion shown above.</div>}
+          <div className="max-h-72 overflow-auto rounded-md border bg-muted/20 p-2">
+            <div className="mb-2 text-xs font-semibold text-muted-foreground">{album.tracks.length} tracks</div>
+            {album.tracks.length ? album.tracks.map((track) => <div key={`${group.key}-${track.number}`} className="grid grid-cols-[2.5rem_1fr] rounded px-2 py-1 text-sm"><span className="text-muted-foreground">{String(track.number).padStart(2, '0')}</span><span className="truncate">{track.title}</span></div>) : <div className="text-sm text-muted-foreground">Track list was not captured for this rip.</div>}
+          </div>
+        </CardContent>
+      </Card>;
+    })}
   </div>;
 }
 
@@ -187,7 +271,13 @@ function DebugPage({ drives }: { drives: DriveSnapshot[] }) {
   </CardContent></Card>;
 }
 
-function History({ history }: { history: HistoryJob[] }) { return <Card><CardHeader><CardTitle>History</CardTitle><CardDescription>Recent rip jobs</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Started</TableHead><TableHead>Drive</TableHead><TableHead>Album</TableHead><TableHead>Status</TableHead><TableHead>Error</TableHead></TableRow></TableHeader><TableBody>{history.map((j) => <TableRow key={j.id}><TableCell>{j.startedAt}</TableCell><TableCell>{j.ripperId}</TableCell><TableCell>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</TableCell><TableCell><Badge variant={j.state === 'completed' ? 'success' : j.state.includes('failed') ? 'destructive' : 'secondary'}>{j.state}</Badge></TableCell><TableCell className="text-red-300">{j.error}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>; }
+function History({ history }: { history: HistoryJob[] }) {
+  const groups = groupHistory(history);
+  return <Card><CardHeader><CardTitle>History</CardTitle><CardDescription>Recent rip jobs</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Started</TableHead><TableHead>Drive</TableHead><TableHead>Album</TableHead><TableHead>Status</TableHead><TableHead>Error</TableHead></TableRow></TableHeader><TableBody>{groups.map((group) => {
+    const j = group.latest;
+    return <TableRow key={group.key}><TableCell>{j.startedAt}</TableCell><TableCell>{j.ripperId}</TableCell><TableCell>{[j.artist, j.album].filter(Boolean).join(' - ') || j.id}</TableCell><TableCell><div className="flex items-center gap-2"><Badge variant={j.state === 'completed' ? 'success' : j.state.includes('failed') ? 'destructive' : 'secondary'}>{j.state}</Badge>{group.items.length > 1 && <Badge variant="secondary">{group.items.length}x</Badge>}</div></TableCell><TableCell className="text-red-300">{j.error}</TableCell></TableRow>;
+  })}</TableBody></Table></CardContent></Card>;
+}
 
 function App() {
   const [state, setState] = useState<ApiState>(empty);
